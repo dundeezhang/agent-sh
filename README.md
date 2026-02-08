@@ -34,7 +34,7 @@ agent-sh
 
 3. Use it like a normal shell, and prefix with `@` to talk to the AI agent:
 
-```
+```text
 agent-sh ~/project> ls
 agent-sh ~/project> git status
 agent-sh ~/project> @ find all TODO comments in the codebase
@@ -55,6 +55,8 @@ The AI agent has access to the following tools:
 | `edit_file` | Find-and-replace editing within files |
 | `search` | Regex search across files (uses ripgrep with grep fallback) |
 | `glob` | Find files by glob pattern |
+| `web_search` | Search the web via DuckDuckGo for docs, examples, and references |
+| `web_fetch` | Fetch a URL and extract readable text content |
 
 The agent runs in a loop of up to 25 turns, deciding which tools to call until the task is complete. Bash commands always require explicit user confirmation before execution.
 
@@ -97,13 +99,13 @@ include_git = true        # include git branch and status in agent context
 
 **Anthropic:** `sonnet` (Claude Sonnet 4.5), `haiku` (Claude Haiku 4.5), `opus` (Claude Opus 4.6)
 
-**OpenAI:** `gpt4o` (GPT-4o), `gpt4o-mini` (GPT-4o Mini)
+**OpenAI:** `gpt4` / `gpt-4` / `gpt4o` / `gpt-4o` (GPT-4o), `gpt4o-mini` / `gpt-4o-mini` (GPT-4o Mini)
 
 **Ollama:** Any model name supported by your Ollama instance. Set provider to `ollama` and agent-sh will use `http://localhost:11434/v1` by default.
 
 ### CLI Flags
 
-```
+```bash
 agent-sh -provider openai    # override provider
 agent-sh -model gpt4o        # override model
 agent-sh -version             # print version
