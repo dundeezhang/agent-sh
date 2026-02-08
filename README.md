@@ -26,13 +26,13 @@ make install
 export ANTHROPIC_API_KEY="sk-..."
 ```
 
-2. Run the shell:
+1. Run the shell:
 
 ```bash
 agent-sh
 ```
 
-3. Use it like a normal shell, and prefix with `@` to talk to the AI agent:
+1. Use it like a normal shell, and prefix with `@` to talk to the AI agent:
 
 ```text
 agent-sh ~/project> ls
