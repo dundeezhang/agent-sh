@@ -91,14 +91,34 @@ func isReadOnlyBash(cmd string) bool {
 		return false
 	}
 
-	// git: check subcommand.
-	if base == "git" && i+1 < len(parts) {
-		return readOnlyGitSubcommands[parts[i+1]]
+	// git: check subcommand (skip leading flags like -C, --no-pager, etc.).
+	if base == "git" {
+		sub := ""
+		for j := i + 1; j < len(parts); j++ {
+			if !strings.HasPrefix(parts[j], "-") {
+				sub = parts[j]
+				break
+			}
+		}
+		if sub == "" {
+			return true // bare "git" with only flags is read-only
+		}
+		return readOnlyGitSubcommands[sub]
 	}
 
-	// go: only read-only subcommands (build, test, vet, list, version, env, doc).
-	if base == "go" && i+1 < len(parts) {
-		return !mutatingGoSubcommands[parts[i+1]]
+	// go: only read-only subcommands (skip leading flags).
+	if base == "go" {
+		sub := ""
+		for j := i + 1; j < len(parts); j++ {
+			if !strings.HasPrefix(parts[j], "-") {
+				sub = parts[j]
+				break
+			}
+		}
+		if sub == "" {
+			return true // bare "go" with only flags is read-only
+		}
+		return !mutatingGoSubcommands[sub]
 	}
 
 	return true

@@ -176,6 +176,9 @@ func (o *OpenAI) Stream(ctx context.Context, params StreamParams) (*Response, er
 					}
 				}
 				if tc.Function.Arguments != "" {
+					if toolArgs[idx] == nil {
+						toolArgs[idx] = &strings.Builder{}
+					}
 					toolArgs[idx].WriteString(tc.Function.Arguments)
 				}
 			}
@@ -209,7 +212,9 @@ func (o *OpenAI) Stream(ctx context.Context, params StreamParams) (*Response, er
 	for _, idx := range indices {
 		tu := toolCalls[idx]
 		if args, ok := toolArgs[idx]; ok && args.Len() > 0 {
-			_ = json.Unmarshal([]byte(args.String()), &tu.Input)
+			if err := json.Unmarshal([]byte(args.String()), &tu.Input); err != nil {
+				return nil, fmt.Errorf("openai: malformed tool call JSON for %q (index %d): %w", tu.Name, idx, err)
+			}
 		}
 		resp.Content = append(resp.Content, ContentBlock{
 			Type:    "tool_use",
