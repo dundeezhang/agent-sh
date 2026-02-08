@@ -3,6 +3,7 @@ package shell
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -98,6 +99,105 @@ func TestCommonPrefix(t *testing.T) {
 		if got != tt.want {
 			t.Errorf("commonPrefix(%v) = %q, want %q", tt.in, got, tt.want)
 		}
+	}
+}
+
+func TestCompleteFile_DotSlashPrefix(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "script.sh"), nil, 0755)
+	os.WriteFile(filepath.Join(dir, "setup.py"), nil, 0644)
+
+	orig, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(orig)
+
+	matches := completeFile("./scr")
+	if len(matches) != 1 || matches[0] != "./script.sh" {
+		t.Errorf("completeFile(\"./scr\") = %v, want [\"./script.sh\"]", matches)
+	}
+}
+
+func TestCompleteFile_DotDotSlashPrefix(t *testing.T) {
+	dir := t.TempDir()
+	sub := filepath.Join(dir, "sub")
+	os.Mkdir(sub, 0755)
+	os.WriteFile(filepath.Join(dir, "parent.txt"), nil, 0644)
+
+	orig, _ := os.Getwd()
+	os.Chdir(sub)
+	defer os.Chdir(orig)
+
+	matches := completeFile("../par")
+	if len(matches) != 1 || matches[0] != "../parent.txt" {
+		t.Errorf("completeFile(\"../par\") = %v, want [\"../parent.txt\"]", matches)
+	}
+}
+
+func TestCompleteFile_AbsolutePathPrefix(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "test.txt"), nil, 0644)
+
+	matches := completeFile(dir + "/te")
+	want := dir + "/test.txt"
+	if len(matches) != 1 || matches[0] != want {
+		t.Errorf("completeFile(%q) = %v, want [%q]", dir+"/te", matches, want)
+	}
+}
+
+func TestCompleteFile_TildePrefix(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		t.Skip("cannot determine home directory")
+	}
+
+	// Find an entry in home dir to use as a test target.
+	entries, err := os.ReadDir(home)
+	if err != nil || len(entries) == 0 {
+		t.Skip("cannot read home directory")
+	}
+
+	// Find a non-hidden entry to test with.
+	var target os.DirEntry
+	for _, e := range entries {
+		if !strings.HasPrefix(e.Name(), ".") {
+			target = e
+			break
+		}
+	}
+	if target == nil {
+		t.Skip("no non-hidden entries in home directory")
+	}
+
+	name := target.Name()
+	// Use enough of the name to likely get a unique match.
+	partial := name
+	if len(partial) > 3 {
+		partial = partial[:3]
+	}
+	matches := completeFile("~/" + partial)
+
+	// All matches must start with ~/, not the expanded home path.
+	for _, m := range matches {
+		if !strings.HasPrefix(m, "~/") {
+			t.Errorf("match %q does not start with \"~/\"", m)
+		}
+		if strings.HasPrefix(m, home) {
+			t.Errorf("match %q contains expanded home path", m)
+		}
+	}
+}
+
+func TestCompleteFile_NoSeparator(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "readme.md"), nil, 0644)
+
+	orig, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(orig)
+
+	matches := completeFile("read")
+	if len(matches) != 1 || matches[0] != "readme.md" {
+		t.Errorf("completeFile(\"read\") = %v, want [\"readme.md\"]", matches)
 	}
 }
 
