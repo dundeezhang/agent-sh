@@ -2,4 +2,4 @@
 # These users will be automatically requested for review when PRs are opened
 
 # Protect main branch - require review from dundeezhang or repo owners
-* @dundeezhang
+* @dundeezhang @coderabbitai
