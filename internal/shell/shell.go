@@ -143,7 +143,10 @@ func (s *Shell) Run() error {
 				t.SetPrompt(prompt())
 				continue
 			case ClassUnsure:
-				fmt.Fprintf(t, "Not sure what you mean. Use @ for AI or @@ for command.\r\n")
+				s.restore()
+				s.agentHandler("[The user typed something ambiguous — it might be a question, a request, or a mistyped command. Respond conversationally. Make your best assumption about what they mean, but do NOT use any tools. Just reply in plain text.]\n\n" + line)
+				s.rawMode()
+				t.SetPrompt(prompt())
 				continue
 			}
 		}
