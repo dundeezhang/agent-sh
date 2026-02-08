@@ -213,8 +213,7 @@ func checkSSRF(host string) error {
 
 	ips, err := net.LookupIP(host)
 	if err != nil {
-		// If DNS fails, let the HTTP client deal with it.
-		return nil
+		return fmt.Errorf("blocked: DNS lookup failed for %s: %v", host, err)
 	}
 
 	for _, ip := range ips {
