@@ -164,7 +164,8 @@ var readOnlyCommands = map[string]bool{
 	"ls": true, "dir": true, "tree": true, "file": true, "stat": true,
 	"wc": true, "du": true, "df": true,
 	"grep": true, "rg": true, "ag": true, "ack": true,
-	"find": true, "fd": true, "locate": true, "which": true, "whereis": true,
+	// find omitted: -delete and -exec can be destructive.
+	"fd": true, "locate": true, "which": true, "whereis": true,
 	"pwd": true, "whoami": true, "id": true, "hostname": true, "uname": true,
 	"date": true, "uptime": true, "env": true, "printenv": true,
 	"echo": true, "printf": true,
@@ -178,8 +179,9 @@ var readOnlyCommands = map[string]bool{
 
 // readOnlyGitSubcommands are git subcommands that only read state.
 var readOnlyGitSubcommands = map[string]bool{
-	"status": true, "log": true, "diff": true, "show": true, "branch": true,
-	"tag": true, "remote": true, "blame": true, "shortlog": true,
+	// branch, tag, remote omitted: can create/delete with args.
+	"status": true, "log": true, "diff": true, "show": true,
+	"blame": true, "shortlog": true,
 	"describe": true, "rev-parse": true, "ls-files": true, "ls-tree": true,
 	"cat-file": true, "reflog": true,
 }

@@ -161,7 +161,21 @@ func executeWebFetch(input map[string]interface{}) ToolResult {
 	}
 	req.Header.Set("User-Agent", "agent-sh/1.0")
 
-	resp, err := httpClient.Do(req)
+	// Use a client that re-checks SSRF on every redirect hop.
+	safeClient := &http.Client{
+		Timeout: httpClient.Timeout,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 10 {
+				return fmt.Errorf("too many redirects")
+			}
+			if err := checkSSRF(req.URL.Hostname()); err != nil {
+				return err
+			}
+			return nil
+		},
+	}
+
+	resp, err := safeClient.Do(req)
 	if err != nil {
 		return ToolResult{Content: fmt.Sprintf("fetch error: %s", err), IsError: true}
 	}
