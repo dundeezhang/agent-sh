@@ -48,9 +48,10 @@ func (s *Shell) Run() error {
 	// Wire stdout through the terminal so output is properly \r\n translated
 	t.SetSize(termSize())
 
-	// Handle terminal resize
+	// Handle terminal resize; stop on exit to avoid goroutine leak.
 	sigWinch := make(chan os.Signal, 1)
 	signal.Notify(sigWinch, syscall.SIGWINCH)
+	defer signal.Stop(sigWinch)
 	go func() {
 		for range sigWinch {
 			t.SetSize(termSize())
@@ -98,11 +99,16 @@ func (s *Shell) Run() error {
 		}
 
 		// @ detection
+		forceBash := false
 		if strings.HasPrefix(line, "@") {
 			rest := line[1:]
 			if strings.HasPrefix(rest, "@") {
-				// @@ escape — strip one @ and execute as command
-				line = rest
+				// @@ escape — force bash, skip classification
+				line = strings.TrimSpace(rest[1:])
+				if line == "" {
+					continue
+				}
+				forceBash = true
 			} else {
 				// Agent mode
 				query := strings.TrimSpace(rest)
@@ -123,10 +129,27 @@ func (s *Shell) Run() error {
 			continue
 		}
 
-		// External command
 		s.history.Add(HistoryEntry{Command: line})
+
+		if !forceBash {
+			switch classifyInput(line) {
+			case ClassAgent:
+				s.restore()
+				s.agentHandler(line)
+				s.rawMode()
+				t.SetPrompt(prompt())
+				continue
+			case ClassUnsure:
+				fmt.Fprintf(t, "Not sure what you mean. Use @ for AI or @@ for command.\r\n")
+				continue
+			}
+		}
+
+		// Execute as shell command; exit-127 fallback sends to agent.
 		s.restore()
-		s.execCommand(line)
+		if exitCode := s.execCommand(line); exitCode == 127 && !forceBash {
+			s.agentHandler(line)
+		}
 		s.rawMode()
 		t.SetPrompt(prompt())
 	}

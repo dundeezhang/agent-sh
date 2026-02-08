@@ -35,10 +35,13 @@ func New(p provider.Provider, model string, registry *tools.Registry, renderer *
 }
 
 // Run executes the agent loop for a single user query.
-func (a *Agent) Run(query string, recentCommands []string) {
+// previousContext is injected into the system prompt (may be empty).
+// Returns an InteractionResult summarising what happened.
+func (a *Agent) Run(query string, recentCommands []string, previousContext string) *InteractionResult {
 	ctx := context.Background()
 	shellCtx := GatherContext(a.includeGit)
 	shellCtx.RecentCommands = recentCommands
+	shellCtx.PreviousContext = previousContext
 	systemPrompt := shellCtx.SystemPrompt()
 
 	messages := []provider.Message{
@@ -50,8 +53,13 @@ func (a *Agent) Run(query string, recentCommands []string) {
 		},
 	}
 
+	var toolCallRecords []ToolCallRecord
+	var lastAssistantText string
+
 	for turn := 0; turn < maxTurns; turn++ {
 		a.renderer.StartSpinner("Thinking...")
+
+		mdw := render.NewMarkdownWriter(os.Stdout)
 
 		resp, err := a.provider.Stream(ctx, provider.StreamParams{
 			Model:     a.model,
@@ -61,18 +69,24 @@ func (a *Agent) Run(query string, recentCommands []string) {
 			MaxTokens: 8192,
 			OnTextDelta: func(text string) {
 				a.renderer.StopSpinner()
-				fmt.Fprint(os.Stdout, text)
+				fmt.Fprint(mdw, text)
 			},
 			OnToolStart: func(name string) {
 				a.renderer.StopSpinner()
 			},
 		})
 
+		mdw.Flush()
 		a.renderer.StopSpinner()
 
 		if err != nil {
 			a.renderer.Error(fmt.Sprintf("Error: %s", err))
-			return
+			return buildResult(query, toolCallRecords, lastAssistantText)
+		}
+
+		// Capture assistant text
+		if t := extractText(resp.Content); t != "" {
+			lastAssistantText = t
 		}
 
 		// Build assistant message from response
@@ -86,7 +100,7 @@ func (a *Agent) Run(query string, recentCommands []string) {
 		if resp.StopReason != "tool_use" {
 			fmt.Fprintln(os.Stdout)
 			a.renderer.Usage(resp.Usage)
-			return
+			return buildResult(query, toolCallRecords, lastAssistantText)
 		}
 
 		// Execute tool calls
@@ -101,7 +115,8 @@ func (a *Agent) Run(query string, recentCommands []string) {
 
 			var result tools.ToolResult
 			if tu.Name == "bash" {
-				if cmd, ok := tu.Input["command"].(string); ok && !a.confirmBash(cmd) {
+				cmd, _ := tu.Input["command"].(string)
+				if cmd != "" && !isReadOnlyBash(cmd) && !a.confirmBash(cmd) {
 					result = tools.ToolResult{Content: "User denied this command.", IsError: true}
 				} else {
 					result = a.registry.Execute(tu.Name, tu.Input)
@@ -111,6 +126,12 @@ func (a *Agent) Run(query string, recentCommands []string) {
 			}
 
 			a.renderer.ToolResult(tu.Name, result.Content, result.IsError)
+
+			toolCallRecords = append(toolCallRecords, ToolCallRecord{
+				Tool:    tu.Name,
+				Input:   extractToolInput(tu.Name, tu.Input),
+				IsError: result.IsError,
+			})
 
 			toolResults = append(toolResults, provider.ContentBlock{
 				Type: "tool_result",
@@ -130,6 +151,135 @@ func (a *Agent) Run(query string, recentCommands []string) {
 	}
 
 	a.renderer.Error(fmt.Sprintf("Agent stopped after %d turns (safety limit)", maxTurns))
+	return buildResult(query, toolCallRecords, lastAssistantText)
+}
+
+// readOnlyCommands are bash commands that only read state and never modify it.
+var readOnlyCommands = map[string]bool{
+	"cat": true, "head": true, "tail": true, "less": true, "more": true,
+	"ls": true, "dir": true, "tree": true, "file": true, "stat": true,
+	"wc": true, "du": true, "df": true,
+	"grep": true, "rg": true, "ag": true, "ack": true,
+	"find": true, "fd": true, "locate": true, "which": true, "whereis": true,
+	"pwd": true, "whoami": true, "id": true, "hostname": true, "uname": true,
+	"date": true, "uptime": true, "env": true, "printenv": true,
+	"echo": true, "printf": true,
+	"diff": true, "cmp": true, "md5sum": true, "shasum": true,
+	"git": true, "go": true, "python": true, "python3": true, "node": true,
+	"jq": true, "yq": true, "xmllint": true,
+	"man": true, "help": true, "type": true,
+	"ps": true, "top": true, "htop": true, "pgrep": true,
+	"lsof": true, "netstat": true, "ss": true,
+}
+
+// readOnlyGitSubcommands are git subcommands that only read state.
+var readOnlyGitSubcommands = map[string]bool{
+	"status": true, "log": true, "diff": true, "show": true, "branch": true,
+	"tag": true, "remote": true, "stash": true, "blame": true, "shortlog": true,
+	"describe": true, "rev-parse": true, "ls-files": true, "ls-tree": true,
+	"cat-file": true, "reflog": true, "config": true,
+}
+
+// mutatingGoSubcommands are go subcommands that modify state.
+var mutatingGoSubcommands = map[string]bool{
+	"install": true, "get": true, "generate": true, "clean": true,
+	"mod": true,
+}
+
+// isReadOnlyBash returns true if a bash command is safe to run without
+// user confirmation (read-only, no side effects).
+func isReadOnlyBash(cmd string) bool {
+	cmd = strings.TrimSpace(cmd)
+	parts := strings.Fields(cmd)
+	if len(parts) == 0 {
+		return false
+	}
+
+	// Strip leading env vars (FOO=bar cmd ...) and sudo.
+	i := 0
+	for i < len(parts) && strings.Contains(parts[i], "=") {
+		i++
+	}
+	if i >= len(parts) {
+		return false
+	}
+	if parts[i] == "sudo" {
+		i++
+		if i >= len(parts) {
+			return false
+		}
+	}
+
+	base := parts[i]
+
+	// Pipelines/chains: every command in the pipeline must be read-only.
+	if strings.ContainsAny(cmd, "|;&") {
+		// Split on shell operators and check each segment.
+		segments := splitShellSegments(cmd)
+		for _, seg := range segments {
+			if !isReadOnlyBash(seg) {
+				return false
+			}
+		}
+		return true
+	}
+
+	if !readOnlyCommands[base] {
+		return false
+	}
+
+	// git: check subcommand.
+	if base == "git" && i+1 < len(parts) {
+		return readOnlyGitSubcommands[parts[i+1]]
+	}
+
+	// go: only read-only subcommands (build, test, vet, list, version, env, doc, fmt).
+	if base == "go" && i+1 < len(parts) {
+		return !mutatingGoSubcommands[parts[i+1]]
+	}
+
+	return true
+}
+
+// splitShellSegments splits a command on unquoted |, &&, ||, ; operators.
+func splitShellSegments(cmd string) []string {
+	var segments []string
+	var current strings.Builder
+	inSingle, inDouble := false, false
+	for i := 0; i < len(cmd); i++ {
+		ch := cmd[i]
+		switch {
+		case ch == '\'' && !inDouble:
+			inSingle = !inSingle
+			current.WriteByte(ch)
+		case ch == '"' && !inSingle:
+			inDouble = !inDouble
+			current.WriteByte(ch)
+		case inSingle || inDouble:
+			current.WriteByte(ch)
+		case ch == '|' || ch == ';':
+			segments = append(segments, current.String())
+			current.Reset()
+			// Skip || or |
+			if ch == '|' && i+1 < len(cmd) && cmd[i+1] == '|' {
+				i++
+			}
+		case ch == '&':
+			if i+1 < len(cmd) && cmd[i+1] == '&' {
+				segments = append(segments, current.String())
+				current.Reset()
+				i++
+			} else {
+				current.WriteByte(ch)
+			}
+		default:
+			current.WriteByte(ch)
+		}
+	}
+	if current.Len() > 0 {
+		segments = append(segments, current.String())
+	}
+	return segments
 }
 
 // confirmBash prompts the user to approve a bash command. Returns true if approved.

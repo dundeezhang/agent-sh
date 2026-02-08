@@ -46,6 +46,14 @@ func (r *Renderer) ToolCall(name string, input map[string]interface{}) {
 		if p, ok := input["pattern"].(string); ok {
 			fmt.Fprintf(os.Stdout, " \033[2m%s\033[0m", p)
 		}
+	case "web_search":
+		if q, ok := input["query"].(string); ok {
+			fmt.Fprintf(os.Stdout, " \033[2m%s\033[0m", truncate(q, 120))
+		}
+	case "web_fetch":
+		if u, ok := input["url"].(string); ok {
+			fmt.Fprintf(os.Stdout, " \033[2m%s\033[0m", truncate(u, 120))
+		}
 	}
 	fmt.Fprintln(os.Stdout)
 }
@@ -92,8 +100,9 @@ func (r *Renderer) StopSpinner() {
 
 func truncate(s string, max int) string {
 	s = strings.ReplaceAll(s, "\n", " ")
-	if len(s) > max {
-		return s[:max] + "..."
+	runes := []rune(s)
+	if len(runes) > max {
+		return string(runes[:max]) + "..."
 	}
 	return s
 }

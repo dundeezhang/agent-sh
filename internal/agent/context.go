@@ -11,12 +11,13 @@ import (
 
 // ShellContext gathers contextual information about the current environment.
 type ShellContext struct {
-	CWD            string
-	OS             string
-	Shell          string
-	GitBranch      string
-	GitStatus      string
-	RecentCommands []string
+	CWD             string
+	OS              string
+	Shell           string
+	GitBranch       string
+	GitStatus       string
+	RecentCommands  []string
+	PreviousContext string
 }
 
 // GatherContext collects the current shell context.
@@ -53,7 +54,9 @@ func (c ShellContext) SystemPrompt() string {
 	sb.WriteString("- **write_file**: Create or overwrite files (auto-creates parent dirs).\n")
 	sb.WriteString("- **edit_file**: Find-and-replace edits on existing files.\n")
 	sb.WriteString("- **search**: Regex search across files (ripgrep).\n")
-	sb.WriteString("- **glob**: Find files matching glob patterns.\n\n")
+	sb.WriteString("- **glob**: Find files matching glob patterns.\n")
+	sb.WriteString("- **web_search**: Search the web (DuckDuckGo). Use when you need docs, examples, or are unsure how to use a library/command.\n")
+	sb.WriteString("- **web_fetch**: Fetch a URL and read its text content. Use to read documentation pages or results from web_search.\n\n")
 
 	sb.WriteString("## Environment\n")
 	fmt.Fprintf(&sb, "- Working directory: %s\n", c.CWD)
@@ -82,7 +85,13 @@ func (c ShellContext) SystemPrompt() string {
 	sb.WriteString("- For multi-step tasks, work through them step by step, checking results as you go.\n")
 	sb.WriteString("- When a command fails, read the error and try a different approach.\n")
 	sb.WriteString("- Prefer non-interactive bash commands (no vim, no less, no interactive prompts).\n")
+	sb.WriteString("- If you're unsure how to use a library, tool, or command, use web_search to look it up before guessing.\n")
 	sb.WriteString("- Be concise. Show what you're doing briefly, not lengthy explanations.\n")
+
+	if c.PreviousContext != "" {
+		sb.WriteString("\n")
+		sb.WriteString(c.PreviousContext)
+	}
 
 	return sb.String()
 }

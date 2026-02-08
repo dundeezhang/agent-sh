@@ -1,6 +1,7 @@
 package shell
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"syscall"
@@ -9,8 +10,8 @@ import (
 	"golang.org/x/term"
 )
 
-// execCommand runs an external command with sh -c.
-func (s *Shell) execCommand(line string) {
+// execCommand runs an external command with sh -c and returns the exit code.
+func (s *Shell) execCommand(line string) int {
 	cmd := exec.Command("sh", "-c", line)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
@@ -23,10 +24,20 @@ func (s *Shell) execCommand(line string) {
 		Ctty:       int(os.Stdin.Fd()),
 	}
 
-	_ = cmd.Run()
+	err := cmd.Run()
 
 	// Restore the shell as the foreground process group.
 	restoreForeground(int(os.Stdin.Fd()))
+
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			return exitErr.ExitCode()
+		}
+		// Non-ExitError (e.g. command not found at OS level) → 127.
+		return 127
+	}
+	return 0
 }
 
 // restoreForeground gives the terminal's foreground process group back to the shell.
