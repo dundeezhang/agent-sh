@@ -60,7 +60,10 @@ func (a *Agent) Run(query string, recentCommands []string, previousContext strin
 	for turn := 0; turn < maxTurns; turn++ {
 		a.renderer.StartSpinner("Thinking...")
 
-		// Fresh per turn: resets inCode state so each response starts clean.
+		// MarkdownWriter is intentionally created per turn: it tracks whether
+		// we are inside a fenced code block (inCode) and buffers partial lines,
+		// so reusing one across turns would let stale state from a previous
+		// response corrupt the rendering of the next.
 		mdw := render.NewMarkdownWriter(os.Stdout)
 
 		var writeErr error
@@ -200,7 +203,7 @@ var readOnlyGitSubcommands = map[string]bool{
 // mutatingGoSubcommands are go subcommands that modify state.
 var mutatingGoSubcommands = map[string]bool{
 	"install": true, "get": true, "generate": true, "clean": true,
-	"mod": true,
+	"mod": true, "fmt": true,
 }
 
 // isReadOnlyBash returns true if a bash command is safe to run without
