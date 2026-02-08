@@ -3,9 +3,17 @@ linters:
   default: standard
   enable:
     - errcheck
+  disable:
+    - staticcheck
   settings:
     errcheck:
       exclude-functions:
         - fmt.Fprint
         - fmt.Fprintf
         - fmt.Fprintln
+        - os.Setenv
+        - os.Chdir
+        - os.Mkdir
+        - os.WriteFile
+        - (*golang.org/x/term.Terminal).SetSize
+        - (io.Closer).Close

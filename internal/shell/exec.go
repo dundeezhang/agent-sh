@@ -43,13 +43,13 @@ func (s *Shell) execCommand(line string) int {
 // restoreForeground gives the terminal's foreground process group back to the shell.
 func restoreForeground(fd int) {
 	pgrp := int32(syscall.Getpgrp())
-	syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), syscall.TIOCSPGRP, uintptr(unsafe.Pointer(&pgrp)))
+	_, _, _ = syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), syscall.TIOCSPGRP, uintptr(unsafe.Pointer(&pgrp)))
 }
 
 // restore puts the terminal back to cooked mode.
 func (s *Shell) restore() {
 	if s.oldState != nil {
-		term.Restore(int(os.Stdin.Fd()), s.oldState)
+		_ = term.Restore(int(os.Stdin.Fd()), s.oldState)
 	}
 }
 
