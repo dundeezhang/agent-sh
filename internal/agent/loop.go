@@ -70,14 +70,14 @@ func (a *Agent) Run(query string, recentCommands []string, previousContext strin
 			MaxTokens: 8192,
 			OnTextDelta: func(text string) {
 				a.renderer.StopSpinner()
-				fmt.Fprint(mdw, text)
+				_, _ = fmt.Fprint(mdw, text)
 			},
 			OnToolStart: func(name string) {
 				a.renderer.StopSpinner()
 			},
 		})
 
-		mdw.Flush()
+		_ = mdw.Flush()
 		a.renderer.StopSpinner()
 
 		if err != nil {
@@ -99,7 +99,7 @@ func (a *Agent) Run(query string, recentCommands []string, previousContext strin
 
 		// If end of turn, we're done
 		if resp.StopReason != "tool_use" {
-			fmt.Fprintln(os.Stdout)
+			_, _ = fmt.Fprintln(os.Stdout)
 			a.renderer.Usage(resp.Usage)
 			return buildResult(query, toolCallRecords, lastAssistantText)
 		}

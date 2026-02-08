@@ -53,8 +53,12 @@ func TestMarkdownWriter_Headers(t *testing.T) {
 		t.Run(tt.input, func(t *testing.T) {
 			var buf bytes.Buffer
 			w := NewMarkdownWriter(&buf)
-			w.Write([]byte(tt.input))
-			w.Flush()
+			if _, err := w.Write([]byte(tt.input)); err != nil {
+				t.Fatal(err)
+			}
+			if err := w.Flush(); err != nil {
+				t.Fatal(err)
+			}
 			if buf.String() != tt.want {
 				t.Errorf("header %q\n got %q\nwant %q", tt.input, buf.String(), tt.want)
 			}
@@ -66,8 +70,12 @@ func TestMarkdownWriter_CodeBlock(t *testing.T) {
 	input := "```go\nfmt.Println(\"hello\")\n```\n"
 	var buf bytes.Buffer
 	w := NewMarkdownWriter(&buf)
-	w.Write([]byte(input))
-	w.Flush()
+	if _, err := w.Write([]byte(input)); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Flush(); err != nil {
+		t.Fatal(err)
+	}
 
 	got := buf.String()
 	// Each line should be dimmed, no inline processing
@@ -83,9 +91,15 @@ func TestMarkdownWriter_StreamedChunks(t *testing.T) {
 	// Simulate streaming: bold text split across two Write calls
 	var buf bytes.Buffer
 	w := NewMarkdownWriter(&buf)
-	w.Write([]byte("say **hel"))
-	w.Write([]byte("lo** world\n"))
-	w.Flush()
+	if _, err := w.Write([]byte("say **hel")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.Write([]byte("lo** world\n")); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Flush(); err != nil {
+		t.Fatal(err)
+	}
 
 	want := "say " + boldOn + "hello" + boldOff + " world\n"
 	if buf.String() != want {
@@ -97,8 +111,12 @@ func TestMarkdownWriter_Flush(t *testing.T) {
 	// Partial line without trailing newline
 	var buf bytes.Buffer
 	w := NewMarkdownWriter(&buf)
-	w.Write([]byte("**bold**"))
-	w.Flush()
+	if _, err := w.Write([]byte("**bold**")); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Flush(); err != nil {
+		t.Fatal(err)
+	}
 
 	want := boldOn + "bold" + boldOff
 	if buf.String() != want {
@@ -109,8 +127,12 @@ func TestMarkdownWriter_Flush(t *testing.T) {
 func TestMarkdownWriter_PlainText(t *testing.T) {
 	var buf bytes.Buffer
 	w := NewMarkdownWriter(&buf)
-	w.Write([]byte("no markdown here\n"))
-	w.Flush()
+	if _, err := w.Write([]byte("no markdown here\n")); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Flush(); err != nil {
+		t.Fatal(err)
+	}
 
 	if buf.String() != "no markdown here\n" {
 		t.Errorf("plain text altered: %q", buf.String())

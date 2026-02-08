@@ -111,7 +111,7 @@ func (a *Anthropic) Stream(ctx context.Context, params StreamParams) (*Response,
 	}
 
 	stream := a.client.Messages.NewStreaming(ctx, messageParams)
-	defer stream.Close()
+	defer func() { _ = stream.Close() }()
 
 	// Process the stream using Accumulate
 	resp := &Response{}

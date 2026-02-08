@@ -55,7 +55,7 @@ func (r *Renderer) ToolCall(name string, input map[string]interface{}) {
 			fmt.Fprintf(os.Stdout, " \033[2m%s\033[0m", truncate(u, 120))
 		}
 	}
-	fmt.Fprintln(os.Stdout)
+	_, _ = fmt.Fprintln(os.Stdout)
 }
 
 // ToolResult displays the result of a tool execution.
