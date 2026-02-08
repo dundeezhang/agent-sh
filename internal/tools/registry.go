@@ -19,9 +19,9 @@ type ToolFunc func(input map[string]interface{}) ToolResult
 
 // Registry holds all available tools.
 type Registry struct {
-	tools    map[string]ToolFunc
-	schemas  map[string]provider.Tool
-	ordered  []string // preserve insertion order for deterministic output
+	tools   map[string]ToolFunc
+	schemas map[string]provider.Tool
+	ordered []string // preserve insertion order for deterministic output
 }
 
 // NewRegistry creates a registry with all built-in tools.
@@ -36,6 +36,8 @@ func NewRegistry() *Registry {
 	r.registerEditFile()
 	r.registerSearch()
 	r.registerGlob()
+	r.registerWebSearch()
+	r.registerWebFetch()
 	return r
 }
 

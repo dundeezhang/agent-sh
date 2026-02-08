@@ -9,8 +9,8 @@ import (
 )
 
 type Config struct {
-	API   APIConfig   `toml:"api"`
-	Shell ShellConfig `toml:"shell"`
+	API     APIConfig     `toml:"api"`
+	Shell   ShellConfig   `toml:"shell"`
 	Context ContextConfig `toml:"context"`
 }
 

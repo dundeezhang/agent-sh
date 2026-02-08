@@ -44,11 +44,11 @@ func (s *Spinner) Start(msg string) {
 			select {
 			case <-s.stop:
 				// Clear the spinner line
-				fmt.Fprint(os.Stdout, "\r\033[2K")
+				_, _ = fmt.Fprint(os.Stdout, "\r\033[2K")
 				return
 			case <-ticker.C:
 				frame := spinnerFrames[i%len(spinnerFrames)]
-				fmt.Fprintf(os.Stdout, "\r\033[2K\033[1;36m%s\033[0m \033[2m%s\033[0m", frame, s.msg)
+				_, _ = fmt.Fprintf(os.Stdout, "\r\033[2K\033[1;36m%s\033[0m \033[2m%s\033[0m", frame, s.msg)
 				i++
 			}
 		}

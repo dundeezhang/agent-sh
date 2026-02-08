@@ -134,12 +134,12 @@ func (o *OpenAI) Stream(ctx context.Context, params StreamParams) (*Response, er
 	if err != nil {
 		return nil, fmt.Errorf("openai stream: %w", err)
 	}
-	defer stream.Close()
+	defer stream.Close() //nolint:errcheck // best-effort close
 
 	resp := &Response{}
 	var textContent string
-	toolCalls := make(map[int]*ToolUse)  // index → tool use
-	toolArgs := make(map[int]string)     // index → accumulated JSON
+	toolCalls := make(map[int]*ToolUse) // index → tool use
+	toolArgs := make(map[int]string)    // index → accumulated JSON
 
 	for {
 		chunk, err := stream.Recv()
