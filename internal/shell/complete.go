@@ -119,6 +119,10 @@ func completeFile(prefix string) []string {
 		dirPrefix = prefix[:idx+1]
 		dir = filepath.Dir(expanded)
 		partial = prefix[idx+1:]
+	} else if strings.HasPrefix(prefix, "~") {
+		dir = expanded
+		dirPrefix = prefix
+		partial = ""
 	} else {
 		dir = "."
 		partial = prefix
