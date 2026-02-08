@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 
 	openai "github.com/sashabaranov/go-openai"
 )
@@ -106,16 +107,12 @@ func (o *OpenAI) Stream(ctx context.Context, params StreamParams) (*Response, er
 	// Build tools
 	var tools []openai.Tool
 	for _, t := range params.Tools {
-		schemaJSON, _ := json.Marshal(t.InputSchema)
-		var schemaMap map[string]interface{}
-		_ = json.Unmarshal(schemaJSON, &schemaMap)
-
 		tools = append(tools, openai.Tool{
 			Type: openai.ToolTypeFunction,
 			Function: &openai.FunctionDefinition{
 				Name:        t.Name,
 				Description: t.Description,
-				Parameters:  schemaMap,
+				Parameters:  t.InputSchema,
 			},
 		})
 	}
@@ -204,7 +201,14 @@ func (o *OpenAI) Stream(ctx context.Context, params StreamParams) (*Response, er
 		})
 	}
 
-	for idx, tu := range toolCalls {
+	// Sort by index to preserve the order the model returned them.
+	indices := make([]int, 0, len(toolCalls))
+	for idx := range toolCalls {
+		indices = append(indices, idx)
+	}
+	sort.Ints(indices)
+	for _, idx := range indices {
+		tu := toolCalls[idx]
 		if args, ok := toolArgs[idx]; ok && args != "" {
 			_ = json.Unmarshal([]byte(args), &tu.Input)
 		}

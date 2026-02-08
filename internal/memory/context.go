@@ -101,8 +101,8 @@ func Render(ctx *Context) string {
 	}
 	var sb strings.Builder
 	sb.WriteString("## Previous interaction")
-	sb.WriteString(fmt.Sprintf(" (%s)\n", ctx.Timestamp.Format("15:04:05")))
-	sb.WriteString(fmt.Sprintf("**Query:** %s\n", ctx.Query))
+	fmt.Fprintf(&sb, " (%s)\n", ctx.Timestamp.Format("15:04:05"))
+	fmt.Fprintf(&sb, "**Query:** %s\n", ctx.Query)
 
 	if len(ctx.ToolCalls) > 0 {
 		sb.WriteString("**Actions:** ")
@@ -115,7 +115,7 @@ func Render(ctx *Context) string {
 	}
 
 	if ctx.Summary != "" {
-		sb.WriteString(fmt.Sprintf("**Result:** %s\n", ctx.Summary))
+		fmt.Fprintf(&sb, "**Result:** %s\n", ctx.Summary)
 	}
 	return sb.String()
 }

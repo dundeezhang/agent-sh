@@ -70,7 +70,7 @@ func executeWebSearch(input map[string]interface{}) ToolResult {
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return ToolResult{Content: fmt.Sprintf("search failed: HTTP %d %s", resp.StatusCode, resp.Status), IsError: true}
+		return ToolResult{Content: fmt.Sprintf("search failed: %s", resp.Status), IsError: true}
 	}
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 512*1024))
@@ -182,7 +182,7 @@ func executeWebFetch(input map[string]interface{}) ToolResult {
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		return ToolResult{Content: fmt.Sprintf("HTTP %d: %s", resp.StatusCode, resp.Status), IsError: true}
+		return ToolResult{Content: fmt.Sprintf("fetch failed: %s", resp.Status), IsError: true}
 	}
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 512*1024))

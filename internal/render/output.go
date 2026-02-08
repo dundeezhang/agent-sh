@@ -24,35 +24,21 @@ func NewRenderer() *Renderer {
 func (r *Renderer) ToolCall(name string, input map[string]interface{}) {
 	fmt.Fprintf(os.Stdout, "\n\033[1;33m⚡ %s\033[0m", name)
 
-	// Show a concise summary of the input
-	switch name {
-	case "bash":
-		if cmd, ok := input["command"].(string); ok {
-			fmt.Fprintf(os.Stdout, " \033[2m%s\033[0m", truncate(cmd, 120))
-		}
-	case "read_file", "write_file":
-		if p, ok := input["path"].(string); ok {
-			fmt.Fprintf(os.Stdout, " \033[2m%s\033[0m", p)
-		}
-	case "edit_file":
-		if p, ok := input["path"].(string); ok {
-			fmt.Fprintf(os.Stdout, " \033[2m%s\033[0m", p)
-		}
-	case "search":
-		if p, ok := input["pattern"].(string); ok {
-			fmt.Fprintf(os.Stdout, " \033[2m%s\033[0m", p)
-		}
-	case "glob":
-		if p, ok := input["pattern"].(string); ok {
-			fmt.Fprintf(os.Stdout, " \033[2m%s\033[0m", p)
-		}
-	case "web_search":
-		if q, ok := input["query"].(string); ok {
-			fmt.Fprintf(os.Stdout, " \033[2m%s\033[0m", truncate(q, 120))
-		}
-	case "web_fetch":
-		if u, ok := input["url"].(string); ok {
-			fmt.Fprintf(os.Stdout, " \033[2m%s\033[0m", truncate(u, 120))
+	// Show a concise summary of the input.
+	// Map tool name to the key holding the most descriptive argument.
+	displayKeys := map[string]string{
+		"bash":       "command",
+		"read_file":  "path",
+		"write_file": "path",
+		"edit_file":  "path",
+		"search":     "pattern",
+		"glob":       "pattern",
+		"web_search": "query",
+		"web_fetch":  "url",
+	}
+	if key, ok := displayKeys[name]; ok {
+		if val, ok := input[key].(string); ok {
+			fmt.Fprintf(os.Stdout, " \033[2m%s\033[0m", truncate(val, 120))
 		}
 	}
 	_, _ = fmt.Fprintln(os.Stdout)

@@ -22,8 +22,6 @@ type APIConfig struct {
 }
 
 type ShellConfig struct {
-	Command string `toml:"command"`
-	Prefix  string `toml:"prefix"`
 }
 
 type ContextConfig struct {
@@ -37,10 +35,7 @@ func DefaultConfig() *Config {
 			Provider: "anthropic",
 			Model:    "sonnet",
 		},
-		Shell: ShellConfig{
-			Command: "/bin/zsh",
-			Prefix:  "@",
-		},
+		Shell: ShellConfig{},
 		Context: ContextConfig{
 			HistorySize: 20,
 			IncludeGit:  true,
