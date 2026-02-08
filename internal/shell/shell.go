@@ -51,7 +51,10 @@ func (s *Shell) Run() error {
 	// Handle terminal resize; stop on exit to avoid goroutine leak.
 	sigWinch := make(chan os.Signal, 1)
 	signal.Notify(sigWinch, syscall.SIGWINCH)
-	defer signal.Stop(sigWinch)
+	defer func() {
+		signal.Stop(sigWinch)
+		close(sigWinch)
+	}()
 	go func() {
 		for range sigWinch {
 			t.SetSize(termSize())
@@ -148,6 +151,7 @@ func (s *Shell) Run() error {
 		// Execute as shell command; exit-127 fallback sends to agent.
 		s.restore()
 		if exitCode := s.execCommand(line); exitCode == 127 && !forceBash {
+			fmt.Fprintf(os.Stderr, "command not found, asking AI...\n")
 			s.agentHandler(line)
 		}
 		s.rawMode()

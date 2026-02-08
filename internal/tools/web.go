@@ -2,7 +2,9 @@ package tools
 
 import (
 	"fmt"
+	"html"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -67,6 +69,10 @@ func executeWebSearch(input map[string]interface{}) ToolResult {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return ToolResult{Content: fmt.Sprintf("search failed: HTTP %d %s", resp.StatusCode, resp.Status), IsError: true}
+	}
+
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 512*1024))
 	if err != nil {
 		return ToolResult{Content: fmt.Sprintf("error reading response: %s", err), IsError: true}
@@ -99,9 +105,9 @@ var (
 	reTag     = regexp.MustCompile(`<[^>]*>`)
 )
 
-func parseDDGResults(html string) []searchResult {
-	links := reResult.FindAllStringSubmatch(html, -1)
-	snippets := reSnippet.FindAllStringSubmatch(html, -1)
+func parseDDGResults(rawHTML string) []searchResult {
+	links := reResult.FindAllStringSubmatch(rawHTML, -1)
+	snippets := reSnippet.FindAllStringSubmatch(rawHTML, -1)
 
 	var results []searchResult
 	for i, link := range links {
@@ -144,6 +150,11 @@ func executeWebFetch(input map[string]interface{}) ToolResult {
 		return ToolResult{Content: "invalid URL: must be http or https", IsError: true}
 	}
 
+	// SSRF protection: reject private/loopback IPs.
+	if err := checkSSRF(parsed.Hostname()); err != nil {
+		return ToolResult{Content: err.Error(), IsError: true}
+	}
+
 	req, err := http.NewRequest("GET", rawURL, nil)
 	if err != nil {
 		return ToolResult{Content: fmt.Sprintf("error creating request: %s", err), IsError: true}
@@ -180,33 +191,45 @@ func executeWebFetch(input map[string]interface{}) ToolResult {
 	return ToolResult{Content: text}
 }
 
-// htmlToText strips HTML tags and decodes common entities, collapsing whitespace.
-func htmlToText(html string) string {
-	// Remove script and style blocks.
-	reScript := regexp.MustCompile(`(?si)<(script|style)[^>]*>.*?</\1>`)
-	html = reScript.ReplaceAllString(html, "")
+// checkSSRF rejects hostnames that resolve to private, loopback, or link-local IPs.
+func checkSSRF(host string) error {
+	if host == "localhost" {
+		return fmt.Errorf("blocked: localhost is not allowed")
+	}
 
-	// Replace block-level tags with newlines.
-	reBlock := regexp.MustCompile(`(?i)</(p|div|h[1-6]|li|tr|br|hr)[^>]*>`)
-	html = reBlock.ReplaceAllString(html, "\n")
-	reBR := regexp.MustCompile(`(?i)<br[^>]*/?>`)
-	html = reBR.ReplaceAllString(html, "\n")
+	ips, err := net.LookupIP(host)
+	if err != nil {
+		// If DNS fails, let the HTTP client deal with it.
+		return nil
+	}
 
-	// Strip remaining tags.
-	text := stripTags(html)
+	for _, ip := range ips {
+		if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+			return fmt.Errorf("blocked: %s resolves to private/loopback address %s", host, ip)
+		}
+	}
+	return nil
+}
 
-	// Decode common HTML entities.
-	text = strings.ReplaceAll(text, "&amp;", "&")
-	text = strings.ReplaceAll(text, "&lt;", "<")
-	text = strings.ReplaceAll(text, "&gt;", ">")
-	text = strings.ReplaceAll(text, "&quot;", "\"")
-	text = strings.ReplaceAll(text, "&#39;", "'")
-	text = strings.ReplaceAll(text, "&nbsp;", " ")
+// Pre-compiled regexps for htmlToText.
+var (
+	reScript     = regexp.MustCompile(`(?si)<(script|style)[^>]*>.*?</\1>`)
+	reBlock      = regexp.MustCompile(`(?i)</(p|div|h[1-6]|li|tr|br|hr)[^>]*>`)
+	reBR         = regexp.MustCompile(`(?i)<br[^>]*/?>`)
+	reSpaces     = regexp.MustCompile(`[^\S\n]+`)
+	reBlankLines = regexp.MustCompile(`\n{3,}`)
+)
 
-	// Collapse whitespace.
-	reSpaces := regexp.MustCompile(`[^\S\n]+`)
+// htmlToText strips HTML tags and decodes entities, collapsing whitespace.
+func htmlToText(rawHTML string) string {
+	rawHTML = reScript.ReplaceAllString(rawHTML, "")
+	rawHTML = reBlock.ReplaceAllString(rawHTML, "\n")
+	rawHTML = reBR.ReplaceAllString(rawHTML, "\n")
+
+	text := stripTags(rawHTML)
+	text = html.UnescapeString(text)
+
 	text = reSpaces.ReplaceAllString(text, " ")
-	reBlankLines := regexp.MustCompile(`\n{3,}`)
 	text = reBlankLines.ReplaceAllString(text, "\n\n")
 
 	return strings.TrimSpace(text)

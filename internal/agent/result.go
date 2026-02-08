@@ -1,6 +1,8 @@
 package agent
 
 import (
+	"strings"
+
 	"github.com/dundeezhang/agent-sh/internal/provider"
 )
 
@@ -20,13 +22,13 @@ type InteractionResult struct {
 
 // extractText pulls the concatenated text from response content blocks.
 func extractText(blocks []provider.ContentBlock) string {
-	var text string
+	var sb strings.Builder
 	for _, b := range blocks {
 		if b.Type == "text" {
-			text += b.Text
+			sb.WriteString(b.Text)
 		}
 	}
-	return text
+	return sb.String()
 }
 
 // extractToolInput returns a short string describing the primary input arg.
@@ -39,6 +41,8 @@ func extractToolInput(name string, input map[string]interface{}) string {
 		"edit_file":  "path",
 		"search":     "pattern",
 		"glob":       "pattern",
+		"web_search": "query",
+		"web_fetch":  "url",
 	}
 	key := keys[name]
 	if key == "" {

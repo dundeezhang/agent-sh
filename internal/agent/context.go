@@ -90,7 +90,11 @@ func (c ShellContext) SystemPrompt() string {
 
 	if c.PreviousContext != "" {
 		sb.WriteString("\n")
-		sb.WriteString(c.PreviousContext)
+		ctx := c.PreviousContext
+		if runes := []rune(ctx); len(runes) > 500 {
+			ctx = string(runes[:500]) + "..."
+		}
+		sb.WriteString(ctx)
 	}
 
 	return sb.String()

@@ -18,6 +18,20 @@ const (
 	ClassUnsure
 )
 
+// String returns the name of the InputClass constant.
+func (c InputClass) String() string {
+	switch c {
+	case ClassCommand:
+		return "ClassCommand"
+	case ClassAgent:
+		return "ClassAgent"
+	case ClassUnsure:
+		return "ClassUnsure"
+	default:
+		return "???"
+	}
+}
+
 // functionWords are words that almost never appear as bare command arguments.
 // If any appears among 2+ remaining args after a known command, the input
 // is likely natural language.
@@ -84,8 +98,26 @@ func classifyInput(line string) InputClass {
 		return ClassCommand
 	}
 
-	// First word is a shell builtin/keyword → command.
+	// First word is a shell builtin/keyword.
+	// echo/printf take arbitrary text — always command.
+	// Others get the same NL check as PATH commands.
 	if isShellBuiltin(first) {
+		if first == "echo" || first == "printf" {
+			return ClassCommand
+		}
+		args := parts[1:]
+		if len(args) == 0 {
+			return ClassCommand
+		}
+		if argsHaveShellPatterns(args) {
+			return ClassCommand
+		}
+		if len(args) == 1 {
+			return ClassCommand
+		}
+		if argsLookLikeSentence(args) {
+			return ClassAgent
+		}
 		return ClassCommand
 	}
 

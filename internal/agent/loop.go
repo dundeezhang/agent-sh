@@ -59,6 +59,7 @@ func (a *Agent) Run(query string, recentCommands []string, previousContext strin
 	for turn := 0; turn < maxTurns; turn++ {
 		a.renderer.StartSpinner("Thinking...")
 
+		// Fresh per turn: resets inCode state so each response starts clean.
 		mdw := render.NewMarkdownWriter(os.Stdout)
 
 		resp, err := a.provider.Stream(ctx, provider.StreamParams{
@@ -116,7 +117,10 @@ func (a *Agent) Run(query string, recentCommands []string, previousContext strin
 			var result tools.ToolResult
 			if tu.Name == "bash" {
 				cmd, _ := tu.Input["command"].(string)
-				if cmd != "" && !isReadOnlyBash(cmd) && !a.confirmBash(cmd) {
+				cmd = strings.TrimSpace(cmd)
+				if cmd == "" {
+					result = tools.ToolResult{Content: "Empty command.", IsError: true}
+				} else if !isReadOnlyBash(cmd) && !a.confirmBash(cmd) {
 					result = tools.ToolResult{Content: "User denied this command.", IsError: true}
 				} else {
 					result = a.registry.Execute(tu.Name, tu.Input)
@@ -165,7 +169,7 @@ var readOnlyCommands = map[string]bool{
 	"date": true, "uptime": true, "env": true, "printenv": true,
 	"echo": true, "printf": true,
 	"diff": true, "cmp": true, "md5sum": true, "shasum": true,
-	"git": true, "go": true, "python": true, "python3": true, "node": true,
+	"git": true, "go": true,
 	"jq": true, "yq": true, "xmllint": true,
 	"man": true, "help": true, "type": true,
 	"ps": true, "top": true, "htop": true, "pgrep": true,
@@ -175,9 +179,9 @@ var readOnlyCommands = map[string]bool{
 // readOnlyGitSubcommands are git subcommands that only read state.
 var readOnlyGitSubcommands = map[string]bool{
 	"status": true, "log": true, "diff": true, "show": true, "branch": true,
-	"tag": true, "remote": true, "stash": true, "blame": true, "shortlog": true,
+	"tag": true, "remote": true, "blame": true, "shortlog": true,
 	"describe": true, "rev-parse": true, "ls-files": true, "ls-tree": true,
-	"cat-file": true, "reflog": true, "config": true,
+	"cat-file": true, "reflog": true,
 }
 
 // mutatingGoSubcommands are go subcommands that modify state.
@@ -192,6 +196,11 @@ func isReadOnlyBash(cmd string) bool {
 	cmd = strings.TrimSpace(cmd)
 	parts := strings.Fields(cmd)
 	if len(parts) == 0 {
+		return false
+	}
+
+	// Reject commands with unquoted redirections or command substitutions.
+	if hasUnsafeRedirects(cmd) {
 		return false
 	}
 
@@ -280,6 +289,28 @@ func splitShellSegments(cmd string) []string {
 		segments = append(segments, current.String())
 	}
 	return segments
+}
+
+// hasUnsafeRedirects returns true if cmd contains unquoted output/input
+// redirections (>, >>, <), backticks, or $() command substitutions.
+func hasUnsafeRedirects(cmd string) bool {
+	inSingle, inDouble := false, false
+	for i := 0; i < len(cmd); i++ {
+		ch := cmd[i]
+		switch {
+		case ch == '\'' && !inDouble:
+			inSingle = !inSingle
+		case ch == '"' && !inSingle:
+			inDouble = !inDouble
+		case inSingle || inDouble:
+			continue
+		case ch == '>' || ch == '<' || ch == '`':
+			return true
+		case ch == '$' && i+1 < len(cmd) && cmd[i+1] == '(':
+			return true
+		}
+	}
+	return false
 }
 
 // confirmBash prompts the user to approve a bash command. Returns true if approved.

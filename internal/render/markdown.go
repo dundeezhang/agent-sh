@@ -1,6 +1,7 @@
 package render
 
 import (
+	"fmt"
 	"io"
 	"regexp"
 	"strings"
@@ -37,20 +38,24 @@ func (m *MarkdownWriter) Write(p []byte) (int, error) {
 		m.buf.WriteString(text[idx+1:])
 
 		rendered := m.renderLine(line)
-		io.WriteString(m.w, rendered+"\n")
+		if _, err := io.WriteString(m.w, rendered+"\n"); err != nil {
+			return n, err
+		}
 	}
 
 	return n, nil
 }
 
 // Flush writes any remaining buffered text (the last partial line).
-func (m *MarkdownWriter) Flush() {
+func (m *MarkdownWriter) Flush() error {
 	if m.buf.Len() > 0 {
 		line := m.buf.String()
 		m.buf.Reset()
 		rendered := m.renderLine(line)
-		io.WriteString(m.w, rendered)
+		_, err := io.WriteString(m.w, rendered)
+		return err
 	}
+	return nil
 }
 
 func (m *MarkdownWriter) renderLine(line string) string {
@@ -102,11 +107,26 @@ var (
 )
 
 // renderInline applies inline markdown formatting (code, bold, italic).
+// Code spans are extracted first and replaced with placeholders so their
+// contents are never touched by the bold/italic regexps.
 func renderInline(s string) string {
-	// Order matters: code first (protect contents), then bold+italic, bold, italic.
-	s = reInlineCode.ReplaceAllString(s, cyanOn+"$1"+colorOff)
+	// Extract inline code spans into placeholders.
+	var codeSpans []string
+	s = reInlineCode.ReplaceAllStringFunc(s, func(m string) string {
+		inner := reInlineCode.FindStringSubmatch(m)[1]
+		idx := len(codeSpans)
+		codeSpans = append(codeSpans, cyanOn+inner+colorOff)
+		return fmt.Sprintf("\x00CODE%d\x00", idx)
+	})
+
+	// Bold/italic on the placeholder-safe text.
 	s = reBoldItalic.ReplaceAllString(s, boldItalicOn+"$1"+biOff)
 	s = reBold.ReplaceAllString(s, boldOn+"$1"+boldOff)
 	s = reItalic.ReplaceAllString(s, italicOn+"$1"+italicOff)
+
+	// Restore code spans.
+	for i, span := range codeSpans {
+		s = strings.Replace(s, fmt.Sprintf("\x00CODE%d\x00", i), span, 1)
+	}
 	return s
 }

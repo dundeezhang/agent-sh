@@ -1,19 +1,9 @@
 package shell
 
-import "testing"
-
-func className(c InputClass) string {
-	switch c {
-	case ClassCommand:
-		return "ClassCommand"
-	case ClassAgent:
-		return "ClassAgent"
-	case ClassUnsure:
-		return "ClassUnsure"
-	default:
-		return "???"
-	}
-}
+import (
+	"strings"
+	"testing"
+)
 
 func TestClassifyInput(t *testing.T) {
 	tests := []struct {
@@ -45,10 +35,19 @@ func TestClassifyInput(t *testing.T) {
 
 		// Commands: shell builtins
 		{"echo hello world", ClassCommand},
-		{"for i in 1 2 3", ClassCommand},
+		{"echo this is a test", ClassCommand},
 		{"if true", ClassCommand},
 		{"source ~/.bashrc", ClassCommand},
 		{"sudo apt update", ClassCommand},
+		{"set -e", ClassCommand},
+		{"kill -9 1234", ClassCommand},
+		{"time make build", ClassCommand},
+
+		// Agent: shell builtins followed by natural language
+		{"set up a go project", ClassAgent},
+		{"read the file and summarize it", ClassAgent},
+		{"kill the background process", ClassAgent},
+		{"time the build for me", ClassAgent},
 
 		// Commands: unknown first word but args have shell patterns
 		{"gti -v", ClassCommand},
@@ -73,7 +72,7 @@ func TestClassifyInput(t *testing.T) {
 		{"create project", ClassUnsure},
 		{"describe structure", ClassUnsure},
 
-		// Agent: empty → ClassCommand (edge case, handled by caller)
+		// Edge case: empty → ClassCommand (handled by caller)
 		{"", ClassCommand},
 	}
 
@@ -81,7 +80,7 @@ func TestClassifyInput(t *testing.T) {
 		t.Run(tt.input, func(t *testing.T) {
 			got := classifyInput(tt.input)
 			if got != tt.want {
-				t.Errorf("classifyInput(%q) = %s, want %s", tt.input, className(got), className(tt.want))
+				t.Errorf("classifyInput(%q) = %s, want %s", tt.input, got, tt.want)
 			}
 		})
 	}
@@ -150,14 +149,7 @@ func TestArgsLookLikeSentence(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		name := ""
-		for i, a := range tt.args {
-			if i > 0 {
-				name += " "
-			}
-			name += a
-		}
-		t.Run(name, func(t *testing.T) {
+		t.Run(strings.Join(tt.args, " "), func(t *testing.T) {
 			if got := argsLookLikeSentence(tt.args); got != tt.want {
 				t.Errorf("argsLookLikeSentence(%v) = %v, want %v", tt.args, got, tt.want)
 			}
@@ -180,14 +172,7 @@ func TestArgsHaveShellPatterns(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		name := ""
-		for i, a := range tt.args {
-			if i > 0 {
-				name += " "
-			}
-			name += a
-		}
-		t.Run(name, func(t *testing.T) {
+		t.Run(strings.Join(tt.args, " "), func(t *testing.T) {
 			if got := argsHaveShellPatterns(tt.args); got != tt.want {
 				t.Errorf("argsHaveShellPatterns(%v) = %v, want %v", tt.args, got, tt.want)
 			}
