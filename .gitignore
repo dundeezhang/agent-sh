@@ -1,0 +1,4 @@
+bin/
+agent-sh
+*.exe
+.DS_Store
