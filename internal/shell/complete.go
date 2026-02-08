@@ -97,10 +97,8 @@ func completeFile(prefix string) []string {
 	// Expand ~ at the start of the prefix for filesystem operations.
 	expanded := prefix
 	home, _ := os.UserHomeDir()
-	tildePrefix := false
 	if home != "" && strings.HasPrefix(expanded, "~") {
 		expanded = home + expanded[1:]
-		tildePrefix = true
 	}
 
 	// Extract the directory prefix from the original input by finding the
@@ -121,10 +119,6 @@ func completeFile(prefix string) []string {
 		dirPrefix = prefix[:idx+1]
 		dir = filepath.Dir(expanded)
 		partial = prefix[idx+1:]
-		// For tilde paths, use the expanded directory for reading.
-		if tildePrefix {
-			dir = filepath.Dir(expanded)
-		}
 	} else {
 		dir = "."
 		partial = prefix
@@ -145,9 +139,6 @@ func completeFile(prefix string) []string {
 		}
 		if strings.HasPrefix(name, partial) {
 			display := dirPrefix + name
-			if tildePrefix && strings.HasPrefix(display, home) {
-				display = "~" + display[len(home):]
-			}
 			if e.IsDir() {
 				display += "/"
 			}
