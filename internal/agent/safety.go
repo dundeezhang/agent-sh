@@ -16,7 +16,7 @@ var readOnlyCommands = map[string]bool{
 	// find omitted: -delete and -exec can be destructive.
 	"fd": true, "locate": true, "which": true, "whereis": true,
 	"pwd": true, "whoami": true, "id": true, "hostname": true, "uname": true,
-	"date": true, "uptime": true, "env": true, "printenv": true,
+	"date": true, "uptime": true, "printenv": true,
 	"echo": true, "printf": true,
 	"diff": true, "cmp": true, "md5sum": true, "shasum": true,
 	"git": true, "go": true,
@@ -148,12 +148,11 @@ func splitShellSegments(cmd string) []string {
 				i++
 			}
 		case ch == '&':
+			segments = append(segments, current.String())
+			current.Reset()
+			// Consume the second '&' for "&&"; a lone '&' is also a separator.
 			if i+1 < len(cmd) && cmd[i+1] == '&' {
-				segments = append(segments, current.String())
-				current.Reset()
 				i++
-			} else {
-				current.WriteByte(ch)
 			}
 		default:
 			current.WriteByte(ch)
