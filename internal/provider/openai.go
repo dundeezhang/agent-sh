@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
+	"strings"
 
 	openai "github.com/sashabaranov/go-openai"
 )
@@ -26,9 +28,7 @@ func NewOpenAI(apiKey string, baseURL string) *OpenAI {
 
 func (o *OpenAI) resolveModel(model string) string {
 	switch model {
-	case "gpt4", "gpt-4":
-		return openai.GPT4o
-	case "gpt4o", "gpt-4o":
+	case "gpt4", "gpt-4", "gpt4o", "gpt-4o":
 		return openai.GPT4o
 	case "gpt4o-mini", "gpt-4o-mini":
 		return openai.GPT4oMini
@@ -45,7 +45,7 @@ func (o *OpenAI) Stream(ctx context.Context, params StreamParams) (*Response, er
 	}
 
 	// Build messages
-	messages := []openai.ChatCompletionMessage{}
+	var messages []openai.ChatCompletionMessage
 	if params.System != "" {
 		messages = append(messages, openai.ChatCompletionMessage{
 			Role:    openai.ChatMessageRoleSystem,
@@ -106,16 +106,12 @@ func (o *OpenAI) Stream(ctx context.Context, params StreamParams) (*Response, er
 	// Build tools
 	var tools []openai.Tool
 	for _, t := range params.Tools {
-		schemaJSON, _ := json.Marshal(t.InputSchema)
-		var schemaMap map[string]interface{}
-		_ = json.Unmarshal(schemaJSON, &schemaMap)
-
 		tools = append(tools, openai.Tool{
 			Type: openai.ToolTypeFunction,
 			Function: &openai.FunctionDefinition{
 				Name:        t.Name,
 				Description: t.Description,
-				Parameters:  schemaMap,
+				Parameters:  t.InputSchema,
 			},
 		})
 	}
@@ -137,9 +133,9 @@ func (o *OpenAI) Stream(ctx context.Context, params StreamParams) (*Response, er
 	defer stream.Close() //nolint:errcheck // best-effort close
 
 	resp := &Response{}
-	var textContent string
-	toolCalls := make(map[int]*ToolUse) // index → tool use
-	toolArgs := make(map[int]string)    // index → accumulated JSON
+	var textContent strings.Builder
+	toolCalls := make(map[int]*ToolUse)          // index → tool use
+	toolArgs := make(map[int]*strings.Builder)    // index → accumulated JSON
 
 	for {
 		chunk, err := stream.Recv()
@@ -155,7 +151,7 @@ func (o *OpenAI) Stream(ctx context.Context, params StreamParams) (*Response, er
 
 			// Text content
 			if delta.Content != "" {
-				textContent += delta.Content
+				textContent.WriteString(delta.Content)
 				if params.OnTextDelta != nil {
 					params.OnTextDelta(delta.Content)
 				}
@@ -174,13 +170,16 @@ func (o *OpenAI) Stream(ctx context.Context, params StreamParams) (*Response, er
 						Name:  tc.Function.Name,
 						Input: make(map[string]interface{}),
 					}
-					toolArgs[idx] = ""
+					toolArgs[idx] = &strings.Builder{}
 					if params.OnToolStart != nil {
 						params.OnToolStart(tc.Function.Name)
 					}
 				}
 				if tc.Function.Arguments != "" {
-					toolArgs[idx] += tc.Function.Arguments
+					if toolArgs[idx] == nil {
+						toolArgs[idx] = &strings.Builder{}
+					}
+					toolArgs[idx].WriteString(tc.Function.Arguments)
 				}
 			}
 
@@ -197,16 +196,25 @@ func (o *OpenAI) Stream(ctx context.Context, params StreamParams) (*Response, er
 	}
 
 	// Build response content
-	if textContent != "" {
+	if textContent.Len() > 0 {
 		resp.Content = append(resp.Content, ContentBlock{
 			Type: "text",
-			Text: textContent,
+			Text: textContent.String(),
 		})
 	}
 
-	for idx, tu := range toolCalls {
-		if args, ok := toolArgs[idx]; ok && args != "" {
-			_ = json.Unmarshal([]byte(args), &tu.Input)
+	// Sort by index to preserve the order the model returned them.
+	indices := make([]int, 0, len(toolCalls))
+	for idx := range toolCalls {
+		indices = append(indices, idx)
+	}
+	sort.Ints(indices)
+	for _, idx := range indices {
+		tu := toolCalls[idx]
+		if args, ok := toolArgs[idx]; ok && args.Len() > 0 {
+			if err := json.Unmarshal([]byte(args.String()), &tu.Input); err != nil {
+				return nil, fmt.Errorf("openai: malformed tool call JSON for %q (index %d): %w", tu.Name, idx, err)
+			}
 		}
 		resp.Content = append(resp.Content, ContentBlock{
 			Type:    "tool_use",

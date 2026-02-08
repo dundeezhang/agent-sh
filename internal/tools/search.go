@@ -2,6 +2,7 @@ package tools
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os/exec"
 	"path/filepath"
@@ -88,11 +89,13 @@ func executeSearch(input map[string]interface{}) ToolResult {
 	err := cmd.Run()
 	if err != nil {
 		// Check if rg is not found — fall back to grep
-		if execErr, ok := err.(*exec.Error); ok && execErr.Err == exec.ErrNotFound {
+		var execErr *exec.Error
+		if errors.As(err, &execErr) && errors.Is(execErr.Err, exec.ErrNotFound) {
 			return executeSearchGrep(pattern, searchPath, globFilter)
 		}
 		// Exit code 1 means no matches (not an error)
-		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
 			return ToolResult{Content: "no matches found"}
 		}
 		if stderr.Len() > 0 {
@@ -121,7 +124,8 @@ func executeSearchGrep(pattern, path, globFilter string) ToolResult {
 
 	err := cmd.Run()
 	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
 			return ToolResult{Content: "no matches found"}
 		}
 		if stderr.Len() > 0 {

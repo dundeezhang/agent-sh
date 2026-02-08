@@ -118,18 +118,18 @@ func TestContainsShellOperator(t *testing.T) {
 	}
 }
 
-func TestIsShellBuiltin(t *testing.T) {
+func TestShellKeywords(t *testing.T) {
 	builtins := []string{"echo", "for", "if", "source", "sudo", "eval", "read"}
 	for _, b := range builtins {
-		if !isShellBuiltin(b) {
-			t.Errorf("isShellBuiltin(%q) = false, want true", b)
+		if !shellKeywords[b] {
+			t.Errorf("shellKeywords[%q] = false, want true", b)
 		}
 	}
 
 	nonBuiltins := []string{"ls", "git", "make", "python", "hello"}
 	for _, nb := range nonBuiltins {
-		if isShellBuiltin(nb) {
-			t.Errorf("isShellBuiltin(%q) = true, want false", nb)
+		if shellKeywords[nb] {
+			t.Errorf("shellKeywords[%q] = true, want false", nb)
 		}
 	}
 }

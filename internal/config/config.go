@@ -10,7 +10,6 @@ import (
 
 type Config struct {
 	API     APIConfig     `toml:"api"`
-	Shell   ShellConfig   `toml:"shell"`
 	Context ContextConfig `toml:"context"`
 }
 
@@ -19,11 +18,6 @@ type APIConfig struct {
 	Key      string `toml:"key"`
 	Model    string `toml:"model"`
 	BaseURL  string `toml:"base_url"`
-}
-
-type ShellConfig struct {
-	Command string `toml:"command"`
-	Prefix  string `toml:"prefix"`
 }
 
 type ContextConfig struct {
@@ -36,10 +30,6 @@ func DefaultConfig() *Config {
 		API: APIConfig{
 			Provider: "anthropic",
 			Model:    "sonnet",
-		},
-		Shell: ShellConfig{
-			Command: "/bin/zsh",
-			Prefix:  "@",
 		},
 		Context: ContextConfig{
 			HistorySize: 20,
