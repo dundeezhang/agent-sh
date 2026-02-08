@@ -205,7 +205,12 @@ func (a *Agent) confirmBash(cmd string) bool {
 	fmt.Fprintf(os.Stdout, "\033[2m[Y/n/a]\033[0m ")
 
 	reader := bufio.NewReader(os.Stdin)
-	line, _ := reader.ReadString('\n')
+	line, err := reader.ReadString('\n')
+	if err != nil {
+		// EOF, broken pipe, etc. — treat as denial to avoid silent approval.
+		fmt.Fprintf(os.Stderr, "failed to read confirmation: %s\n", err)
+		return false
+	}
 	answer := strings.TrimSpace(strings.ToLower(line))
 
 	switch answer {
