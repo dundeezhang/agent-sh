@@ -2,15 +2,15 @@ name: Go CI
 
 on:
   push:
-    branches: [ main, extra-features ]
+    branches: [main, extra-features]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -34,7 +34,7 @@ jobs:
       run: go test -v -race -coverprofile=coverage.out ./...
 
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v5
       with:
         file: ./coverage.out
         flags: unittests
@@ -46,7 +46,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -63,12 +63,12 @@ jobs:
     - name: Run basic smoke test
       if: matrix.os != 'windows-latest'
       run: |
-        ./agent-sh --help || true
+        ./agent-sh --version
 
   lint:
     name: Lint
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -80,7 +80,7 @@ jobs:
         cache: true
 
     - name: golangci-lint
-      uses: golangci/golangci-lint-action@v4
+      uses: golangci/golangci-lint-action@v6
       with:
-        version: latest
+        version: v1.62.2
         args: --timeout=5m

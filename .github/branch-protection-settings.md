@@ -5,8 +5,9 @@ To configure branch protection for the `main` branch, go to:
 
 ## Recommended Settings:
 
-### Branch name pattern:
-```
+### Branch name pattern
+
+```text
 main
 ```
 
@@ -39,12 +40,9 @@ main
 ✅ **Restrict who can push to matching branches**
   - Add: @dundeezhang and repository administrators only
 
-✅ **Allow force pushes**
-  - Specify who can force push:
-    - Repository administrators only
+❌ **Allow force pushes** — Disabled
 
-✅ **Allow deletions**
-  - ❌ Disabled
+❌ **Allow deletions** — Disabled
 
 ---
 
