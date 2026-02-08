@@ -94,24 +94,39 @@ func completeCommand(prefix string) []string {
 
 // completeFile returns file/directory names matching prefix.
 func completeFile(prefix string) []string {
-	// Expand ~ at the start of the prefix.
+	// Expand ~ at the start of the prefix for filesystem operations.
 	expanded := prefix
 	home, _ := os.UserHomeDir()
 	if home != "" && strings.HasPrefix(expanded, "~") {
 		expanded = home + expanded[1:]
 	}
 
-	// Split into directory and partial filename.
-	dir := filepath.Dir(expanded)
-	partial := filepath.Base(expanded)
+	// Extract the directory prefix from the original input by finding the
+	// last path separator, preserving prefixes like ./, ../, /path/to/.
+	var dirPrefix string
+	var dir string
+	var partial string
 
-	// Special case: if the prefix is empty or ends with /, list the directory contents.
 	if prefix == "" {
 		dir = "."
 		partial = ""
+		dirPrefix = ""
 	} else if strings.HasSuffix(prefix, "/") {
 		dir = expanded
 		partial = ""
+		dirPrefix = prefix
+	} else if idx := strings.LastIndex(prefix, "/"); idx >= 0 {
+		dirPrefix = prefix[:idx+1]
+		dir = filepath.Dir(expanded)
+		partial = prefix[idx+1:]
+	} else if strings.HasPrefix(prefix, "~") {
+		dir = expanded
+		dirPrefix = prefix
+		partial = ""
+	} else {
+		dir = "."
+		partial = prefix
+		dirPrefix = ""
 	}
 
 	entries, err := os.ReadDir(dir)
@@ -127,7 +142,7 @@ func completeFile(prefix string) []string {
 			continue
 		}
 		if strings.HasPrefix(name, partial) {
-			display := name
+			display := dirPrefix + name
 			if e.IsDir() {
 				display += "/"
 			}
