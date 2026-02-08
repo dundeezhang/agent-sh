@@ -1,5 +1,6 @@
 # agent-sh
 
+[![CodeFactor](https://www.codefactor.io/repository/github/dundeezhang/agent-sh/badge)](https://www.codefactor.io/repository/github/dundeezhang/agent-sh)
 ![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/dundeezhang/agent-sh?utm_source=oss&utm_medium=github&utm_campaign=dundeezhang%2Fagent-sh&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 
 An AI-powered terminal shell. Use your shell as usual, and prefix any command with `@` to invoke an AI agent that can execute commands, read and write files, search code, and more.
