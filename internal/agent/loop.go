@@ -16,11 +16,12 @@ const maxTurns = 25
 
 // Agent orchestrates the conversation loop with the LLM.
 type Agent struct {
-	provider   provider.Provider
-	model      string
-	registry   *tools.Registry
-	renderer   *render.Renderer
-	includeGit bool
+	provider    provider.Provider
+	model       string
+	registry    *tools.Registry
+	renderer    *render.Renderer
+	includeGit  bool
+	autoApprove bool
 }
 
 // New creates a new Agent.
@@ -326,12 +327,28 @@ func hasUnsafeRedirects(cmd string) bool {
 }
 
 // confirmBash prompts the user to approve a bash command. Returns true if approved.
+// Default is Yes (just press Enter). Typing "a" enables auto-approve for the session.
 func (a *Agent) confirmBash(cmd string) bool {
+	if a.autoApprove {
+		fmt.Fprintf(os.Stdout, "\033[1;33mRun:\033[0m %s\n", cmd)
+		return true
+	}
+
 	fmt.Fprintf(os.Stdout, "\033[1;33mRun:\033[0m %s\n", cmd)
-	fmt.Fprintf(os.Stdout, "\033[2m[y/N]\033[0m ")
+	fmt.Fprintf(os.Stdout, "\033[2m[Y/n/a]\033[0m ")
 
 	reader := bufio.NewReader(os.Stdin)
 	line, _ := reader.ReadString('\n')
 	answer := strings.TrimSpace(strings.ToLower(line))
-	return answer == "y" || answer == "yes"
+
+	switch answer {
+	case "n", "no":
+		return false
+	case "a", "always":
+		a.autoApprove = true
+		return true
+	default:
+		// Enter or "y"/"yes" — approve
+		return true
+	}
 }
