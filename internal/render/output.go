@@ -8,6 +8,18 @@ import (
 	"github.com/dundeezhang/agent-sh/internal/provider"
 )
 
+// toolDisplayKey maps tool names to the key holding their most descriptive argument.
+var toolDisplayKey = map[string]string{
+	"bash":       "command",
+	"read_file":  "path",
+	"write_file": "path",
+	"edit_file":  "path",
+	"search":     "pattern",
+	"glob":       "pattern",
+	"web_search": "query",
+	"web_fetch":  "url",
+}
+
 // Renderer handles styled terminal output for the agent.
 type Renderer struct {
 	spinner *Spinner
@@ -25,18 +37,7 @@ func (r *Renderer) ToolCall(name string, input map[string]interface{}) {
 	fmt.Fprintf(os.Stdout, "\n\033[1;33m⚡ %s\033[0m", name)
 
 	// Show a concise summary of the input.
-	// Map tool name to the key holding the most descriptive argument.
-	displayKeys := map[string]string{
-		"bash":       "command",
-		"read_file":  "path",
-		"write_file": "path",
-		"edit_file":  "path",
-		"search":     "pattern",
-		"glob":       "pattern",
-		"web_search": "query",
-		"web_fetch":  "url",
-	}
-	if key, ok := displayKeys[name]; ok {
+	if key, ok := toolDisplayKey[name]; ok {
 		if val, ok := input[key].(string); ok {
 			fmt.Fprintf(os.Stdout, " \033[2m%s\033[0m", truncate(val, 120))
 		}

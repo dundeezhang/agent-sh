@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
@@ -17,7 +18,7 @@ type Anthropic struct {
 // NewAnthropic creates a new Anthropic provider.
 // apiKey can be empty if ANTHROPIC_API_KEY env var is set.
 func NewAnthropic(apiKey string) *Anthropic {
-	opts := []option.RequestOption{}
+	var opts []option.RequestOption
 	if apiKey != "" {
 		opts = append(opts, option.WithAPIKey(apiKey))
 	}
@@ -117,7 +118,7 @@ func (a *Anthropic) Stream(ctx context.Context, params StreamParams) (*Response,
 	resp := &Response{}
 	message := anthropic.Message{}
 	var currentToolUse *ToolUse
-	var toolInputJSON string
+	var toolInputJSON strings.Builder
 
 	for stream.Next() {
 		event := stream.Current()
@@ -132,7 +133,7 @@ func (a *Anthropic) Stream(ctx context.Context, params StreamParams) (*Response,
 					Name:  name,
 					Input: make(map[string]interface{}),
 				}
-				toolInputJSON = ""
+				toolInputJSON.Reset()
 				if params.OnToolStart != nil {
 					params.OnToolStart(name)
 				}
@@ -145,20 +146,20 @@ func (a *Anthropic) Stream(ctx context.Context, params StreamParams) (*Response,
 					params.OnTextDelta(text)
 				}
 			} else if event.Delta.Type == "input_json_delta" {
-				toolInputJSON += event.Delta.PartialJSON
+				toolInputJSON.WriteString(event.Delta.PartialJSON)
 			}
 
 		case "content_block_stop":
 			if currentToolUse != nil {
-				if toolInputJSON != "" {
-					_ = json.Unmarshal([]byte(toolInputJSON), &currentToolUse.Input)
+				if toolInputJSON.Len() > 0 {
+					_ = json.Unmarshal([]byte(toolInputJSON.String()), &currentToolUse.Input)
 				}
 				resp.Content = append(resp.Content, ContentBlock{
 					Type:    "tool_use",
 					ToolUse: currentToolUse,
 				})
 				currentToolUse = nil
-				toolInputJSON = ""
+				toolInputJSON.Reset()
 			}
 
 		case "message_delta":

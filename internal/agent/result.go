@@ -31,20 +31,21 @@ func extractText(blocks []provider.ContentBlock) string {
 	return sb.String()
 }
 
+// toolDisplayKey maps tool names to the key holding their most descriptive argument.
+var toolDisplayKey = map[string]string{
+	"bash":       "command",
+	"read_file":  "path",
+	"write_file": "path",
+	"edit_file":  "path",
+	"search":     "pattern",
+	"glob":       "pattern",
+	"web_search": "query",
+	"web_fetch":  "url",
+}
+
 // extractToolInput returns a short string describing the primary input arg.
 func extractToolInput(name string, input map[string]interface{}) string {
-	// Pick the most meaningful key per tool.
-	keys := map[string]string{
-		"bash":       "command",
-		"read_file":  "path",
-		"write_file": "path",
-		"edit_file":  "path",
-		"search":     "pattern",
-		"glob":       "pattern",
-		"web_search": "query",
-		"web_fetch":  "url",
-	}
-	key := keys[name]
+	key := toolDisplayKey[name]
 	if key == "" {
 		key = "command"
 	}

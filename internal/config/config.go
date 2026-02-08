@@ -10,7 +10,6 @@ import (
 
 type Config struct {
 	API     APIConfig     `toml:"api"`
-	Shell   ShellConfig   `toml:"shell"`
 	Context ContextConfig `toml:"context"`
 }
 
@@ -19,9 +18,6 @@ type APIConfig struct {
 	Key      string `toml:"key"`
 	Model    string `toml:"model"`
 	BaseURL  string `toml:"base_url"`
-}
-
-type ShellConfig struct {
 }
 
 type ContextConfig struct {
@@ -35,7 +31,6 @@ func DefaultConfig() *Config {
 			Provider: "anthropic",
 			Model:    "sonnet",
 		},
-		Shell: ShellConfig{},
 		Context: ContextConfig{
 			HistorySize: 20,
 			IncludeGit:  true,

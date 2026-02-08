@@ -73,7 +73,7 @@ func main() {
 			_ = memory.Delete(cwd)
 		}
 
-		result := ag.Run(input, history.Commands(), prevContext)
+		result := ag.Run(input, history.Recent(0), prevContext)
 
 		// Persist the new interaction context.
 		if result != nil && cwd != "" {

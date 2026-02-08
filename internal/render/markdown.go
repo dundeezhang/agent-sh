@@ -64,12 +64,12 @@ func (m *MarkdownWriter) renderLine(line string) string {
 	// Code fence toggle.
 	if strings.HasPrefix(trimmed, "```") {
 		m.inCode = !m.inCode
-		return "\033[2m" + line + "\033[0m"
+		return dimOn + line + reset
 	}
 
 	// Inside code block — dim, no markdown processing.
 	if m.inCode {
-		return "\033[2m" + line + "\033[0m"
+		return dimOn + line + reset
 	}
 
 	// Headers: # … → bold.
@@ -80,7 +80,7 @@ func (m *MarkdownWriter) renderLine(line string) string {
 		}
 		if i <= 6 && i < len(trimmed) && trimmed[i] == ' ' {
 			heading := trimmed[i+1:]
-			return "\033[1m" + renderInline(heading) + "\033[0m"
+			return boldOn + renderInline(heading) + reset
 		}
 	}
 
@@ -91,12 +91,14 @@ func (m *MarkdownWriter) renderLine(line string) string {
 const (
 	boldOn       = "\033[1m"
 	boldOff      = "\033[22m"
+	dimOn        = "\033[2m"
 	italicOn     = "\033[3m"
 	italicOff    = "\033[23m"
 	cyanOn       = "\033[36m"
 	colorOff     = "\033[39m"
 	boldItalicOn = "\033[1;3m"
 	biOff        = "\033[22;23m"
+	reset        = "\033[0m"
 )
 
 var (

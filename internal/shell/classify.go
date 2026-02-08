@@ -101,7 +101,7 @@ func classifyInput(line string) InputClass {
 	// First word is a shell builtin/keyword.
 	// echo/printf take arbitrary text — always command.
 	// Others get the same NL check as PATH commands.
-	if isShellBuiltin(first) {
+	if shellKeywords[first] {
 		if first == "echo" || first == "printf" {
 			return ClassCommand
 		}
@@ -187,11 +187,6 @@ func containsShellOperator(line string) bool {
 		}
 	}
 	return false
-}
-
-// isShellBuiltin returns true if word is a known shell builtin or keyword.
-func isShellBuiltin(word string) bool {
-	return shellKeywords[word]
 }
 
 // argsHaveShellPatterns returns true if any arg looks like a flag, path, or glob.

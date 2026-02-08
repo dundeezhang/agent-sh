@@ -28,6 +28,16 @@ func New(history *History, agentHandler AgentHandler) *Shell {
 	}
 }
 
+// runAgent restores cooked mode, calls the agent handler, then re-enters
+// raw mode and refreshes the prompt. This pattern is repeated in several
+// places in the REPL so it's factored out here.
+func (s *Shell) runAgent(t *term.Terminal, input string) {
+	s.restore()
+	s.agentHandler(input)
+	s.rawMode()
+	t.SetPrompt(prompt())
+}
+
 // Run starts the shell REPL and blocks until exit.
 func (s *Shell) Run() error {
 	fd := int(os.Stdin.Fd())
@@ -116,11 +126,8 @@ func (s *Shell) Run() error {
 				// Agent mode
 				query := strings.TrimSpace(rest)
 				if query != "" {
-					s.history.Add(HistoryEntry{Command: line})
-					s.restore()
-					s.agentHandler(query)
-					s.rawMode()
-					t.SetPrompt(prompt())
+					s.history.Add(line)
+					s.runAgent(t, query)
 				}
 				continue
 			}
@@ -128,25 +135,19 @@ func (s *Shell) Run() error {
 
 		// Builtins
 		if s.handleBuiltin(line, t) {
-			s.history.Add(HistoryEntry{Command: line})
+			s.history.Add(line)
 			continue
 		}
 
-		s.history.Add(HistoryEntry{Command: line})
+		s.history.Add(line)
 
 		if !forceBash {
 			switch classifyInput(line) {
 			case ClassAgent:
-				s.restore()
-				s.agentHandler(line)
-				s.rawMode()
-				t.SetPrompt(prompt())
+				s.runAgent(t, line)
 				continue
 			case ClassUnsure:
-				s.restore()
-				s.agentHandler("[The user typed something ambiguous — it might be a question, a request, or a mistyped command. Respond conversationally. Make your best assumption about what they mean, but do NOT use any tools. Just reply in plain text.]\n\n" + line)
-				s.rawMode()
-				t.SetPrompt(prompt())
+				s.runAgent(t, "[The user typed something ambiguous — it might be a question, a request, or a mistyped command. Respond conversationally. Make your best assumption about what they mean, but do NOT use any tools. Just reply in plain text.]\n\n"+line)
 				continue
 			}
 		}

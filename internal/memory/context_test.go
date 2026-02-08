@@ -3,6 +3,7 @@ package memory
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -23,22 +24,22 @@ func TestRender(t *testing.T) {
 	got := Render(ctx)
 
 	// Check header with timestamp.
-	if want := "## Previous interaction (14:30:45)\n"; !contains(got, want) {
+	if want := "## Previous interaction (14:30:45)\n"; !strings.Contains(got, want) {
 		t.Errorf("missing header; got:\n%s", got)
 	}
 	// Check query line.
-	if want := "**Query:** list all Go files\n"; !contains(got, want) {
+	if want := "**Query:** list all Go files\n"; !strings.Contains(got, want) {
 		t.Errorf("missing query line; got:\n%s", got)
 	}
 	// Check actions line includes both tool calls.
-	if want := "Bash(`find . -name '*.go'`)"; !contains(got, want) {
+	if want := "Bash(`find . -name '*.go'`)"; !strings.Contains(got, want) {
 		t.Errorf("missing first tool call; got:\n%s", got)
 	}
-	if want := "Read(`main.go`)"; !contains(got, want) {
+	if want := "Read(`main.go`)"; !strings.Contains(got, want) {
 		t.Errorf("missing second tool call; got:\n%s", got)
 	}
 	// Check result line.
-	if want := "**Result:** Found 12 Go files in the project.\n"; !contains(got, want) {
+	if want := "**Result:** Found 12 Go files in the project.\n"; !strings.Contains(got, want) {
 		t.Errorf("missing result line; got:\n%s", got)
 	}
 }
@@ -53,10 +54,10 @@ func TestRenderNoToolCalls(t *testing.T) {
 
 	got := Render(ctx)
 
-	if contains(got, "**Actions:**") {
+	if strings.Contains(got, "**Actions:**") {
 		t.Errorf("should not contain Actions line when no tool calls; got:\n%s", got)
 	}
-	if !contains(got, "**Result:** greeted user") {
+	if !strings.Contains(got, "**Result:** greeted user") {
 		t.Errorf("missing result line; got:\n%s", got)
 	}
 }
@@ -70,7 +71,7 @@ func TestRenderNoSummary(t *testing.T) {
 
 	got := Render(ctx)
 
-	if contains(got, "**Result:**") {
+	if strings.Contains(got, "**Result:**") {
 		t.Errorf("should not contain Result line when summary is empty; got:\n%s", got)
 	}
 }
@@ -188,16 +189,3 @@ func TestReadNonExistent(t *testing.T) {
 	}
 }
 
-// contains is a small helper to check substring presence.
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsStr(s, substr))
-}
-
-func containsStr(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}

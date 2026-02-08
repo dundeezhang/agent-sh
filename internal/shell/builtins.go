@@ -56,8 +56,8 @@ func (s *Shell) handleBuiltin(line string, t *term.Terminal) bool {
 		return true
 
 	case "history":
-		for i, entry := range s.history.Recent(0) {
-			fmt.Fprintf(t, "%4d  %s\r\n", i+1, entry.Command)
+		for i, cmd := range s.history.Recent(0) {
+			fmt.Fprintf(t, "%4d  %s\r\n", i+1, cmd)
 		}
 		return true
 	}
