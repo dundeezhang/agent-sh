@@ -238,15 +238,18 @@ func isReadOnlyBash(cmd string) bool {
 	base := parts[i]
 
 	// Pipelines/chains: every command in the pipeline must be read-only.
+	// Only recurse when there are actually multiple segments to avoid
+	// infinite recursion on quoted operators or a lone '&'.
 	if strings.ContainsAny(cmd, "|;&") {
-		// Split on shell operators and check each segment.
 		segments := splitShellSegments(cmd)
-		for _, seg := range segments {
-			if !isReadOnlyBash(seg) {
-				return false
+		if len(segments) > 1 {
+			for _, seg := range segments {
+				if !isReadOnlyBash(seg) {
+					return false
+				}
 			}
+			return true
 		}
-		return true
 	}
 
 	if !readOnlyCommands[base] {
@@ -309,6 +312,8 @@ func splitShellSegments(cmd string) []string {
 
 // hasUnsafeRedirects returns true if cmd contains unquoted output/input
 // redirections (>, >>, <), backticks, or $() command substitutions.
+// Single quotes suppress everything. Double quotes suppress redirects
+// but NOT backticks or $() (which are expanded inside double quotes).
 func hasUnsafeRedirects(cmd string) bool {
 	inSingle, inDouble := false, false
 	for i := 0; i < len(cmd); i++ {
@@ -318,11 +323,15 @@ func hasUnsafeRedirects(cmd string) bool {
 			inSingle = !inSingle
 		case ch == '"' && !inSingle:
 			inDouble = !inDouble
-		case inSingle || inDouble:
+		case inSingle:
 			continue
-		case ch == '>' || ch == '<' || ch == '`':
+		case ch == '`':
 			return true
 		case ch == '$' && i+1 < len(cmd) && cmd[i+1] == '(':
+			return true
+		case inDouble:
+			continue
+		case ch == '>' || ch == '<':
 			return true
 		}
 	}
