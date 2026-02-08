@@ -62,6 +62,7 @@ func (a *Agent) Run(query string, recentCommands []string, previousContext strin
 		// Fresh per turn: resets inCode state so each response starts clean.
 		mdw := render.NewMarkdownWriter(os.Stdout)
 
+		var writeErr error
 		resp, err := a.provider.Stream(ctx, provider.StreamParams{
 			Model:     a.model,
 			System:    systemPrompt,
@@ -70,15 +71,24 @@ func (a *Agent) Run(query string, recentCommands []string, previousContext strin
 			MaxTokens: 8192,
 			OnTextDelta: func(text string) {
 				a.renderer.StopSpinner()
-				_, _ = fmt.Fprint(mdw, text)
+				if _, werr := fmt.Fprint(mdw, text); werr != nil && writeErr == nil {
+					writeErr = werr
+				}
 			},
 			OnToolStart: func(name string) {
 				a.renderer.StopSpinner()
 			},
 		})
 
-		_ = mdw.Flush()
+		if ferr := mdw.Flush(); ferr != nil && writeErr == nil {
+			writeErr = ferr
+		}
 		a.renderer.StopSpinner()
+
+		if writeErr != nil {
+			a.renderer.Error(fmt.Sprintf("Error writing output: %s", writeErr))
+			return buildResult(query, toolCallRecords, lastAssistantText)
+		}
 
 		if err != nil {
 			a.renderer.Error(fmt.Sprintf("Error: %s", err))
