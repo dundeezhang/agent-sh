@@ -227,7 +227,8 @@ func checkSSRF(host string) error {
 
 // Pre-compiled regexps for htmlToText.
 var (
-	reScript     = regexp.MustCompile(`(?si)<(script|style)[^>]*>.*?</\1>`)
+	reScript = regexp.MustCompile(`(?si)<script[^>]*>.*?</script>`)
+	reStyle  = regexp.MustCompile(`(?si)<style[^>]*>.*?</style>`)
 	reBlock      = regexp.MustCompile(`(?i)</(p|div|h[1-6]|li|tr|br|hr)[^>]*>`)
 	reBR         = regexp.MustCompile(`(?i)<br[^>]*/?>`)
 	reSpaces     = regexp.MustCompile(`[^\S\n]+`)
@@ -237,6 +238,7 @@ var (
 // htmlToText strips HTML tags and decodes entities, collapsing whitespace.
 func htmlToText(rawHTML string) string {
 	rawHTML = reScript.ReplaceAllString(rawHTML, "")
+	rawHTML = reStyle.ReplaceAllString(rawHTML, "")
 	rawHTML = reBlock.ReplaceAllString(rawHTML, "\n")
 	rawHTML = reBR.ReplaceAllString(rawHTML, "\n")
 
