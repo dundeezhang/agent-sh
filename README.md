@@ -1,4 +1,4 @@
-# agent-sh
+# agent-sh (WIP)
 
 [![CodeFactor](https://www.codefactor.io/repository/github/dundeezhang/agent-sh/badge)](https://www.codefactor.io/repository/github/dundeezhang/agent-sh)
 ![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/dundeezhang/agent-sh?utm_source=oss&utm_medium=github&utm_campaign=dundeezhang%2Fagent-sh&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
