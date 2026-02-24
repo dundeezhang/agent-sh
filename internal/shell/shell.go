@@ -38,6 +38,47 @@ func (s *Shell) runAgent(t *term.Terminal, input string) {
 	t.SetPrompt(prompt())
 }
 
+// readMultiLine reads continuation lines when the input is incomplete.
+// It returns the fully assembled command once the input is complete, or
+// an error if EOF is encountered during continuation.
+func (s *Shell) readMultiLine(t *term.Terminal, firstLine string) (string, error) {
+	accumulated := firstLine
+	prompted := false
+
+	for {
+		reason, _ := needsContinuation(accumulated)
+		if reason == ContinuationNone {
+			if prompted {
+				t.SetPrompt(prompt())
+			}
+			return accumulated, nil
+		}
+
+		// Switch to continuation prompt.
+		if !prompted {
+			prompted = true
+		}
+		t.SetPrompt(continuationPrompt())
+
+		next, err := t.ReadLine()
+		if err != nil {
+			// Restore primary prompt before returning.
+			t.SetPrompt(prompt())
+			return "", err
+		}
+
+		switch reason {
+		case ContinuationBackslash:
+			// Strip the trailing backslash and append the next line directly.
+			accumulated = strings.TrimRight(accumulated, " \t")
+			accumulated = accumulated[:len(accumulated)-1] + next
+		default:
+			// Quotes, brackets, heredoc: append with newline.
+			accumulated += "\n" + next
+		}
+	}
+}
+
 // Run starts the shell REPL and blocks until exit.
 func (s *Shell) Run() error {
 	fd := int(os.Stdin.Fd())
@@ -109,6 +150,14 @@ func (s *Shell) Run() error {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
+		}
+
+		// Multi-line input: check if the line needs continuation.
+		line, err = s.readMultiLine(t, line)
+		if err != nil {
+			// EOF during continuation — exit
+			fmt.Fprintln(t, "")
+			return nil
 		}
 
 		// @ detection
