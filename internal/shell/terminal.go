@@ -8,8 +8,9 @@ import (
 	"golang.org/x/term"
 )
 
-// prompt returns the shell prompt string showing CWD.
-func prompt() string {
+// prompt returns the shell prompt string showing CWD and, when non-zero,
+// the last command's exit code in red.
+func prompt(exitCode int) string {
 	dir, err := os.Getwd()
 	if err != nil {
 		dir = "?"
@@ -18,7 +19,11 @@ func prompt() string {
 	if home != "" && strings.HasPrefix(dir, home) {
 		dir = "~" + dir[len(home):]
 	}
-	return fmt.Sprintf("\033[1;34magent-sh\033[0m %s\033[1;34m>\033[0m ", dir)
+	exitIndicator := ""
+	if exitCode != 0 {
+		exitIndicator = fmt.Sprintf(" \033[1;31m[%d]\033[0m", exitCode)
+	}
+	return fmt.Sprintf("\033[1;34magent-sh\033[0m %s%s\033[1;34m>\033[0m ", dir, exitIndicator)
 }
 
 // termSize returns the current terminal width and height.
