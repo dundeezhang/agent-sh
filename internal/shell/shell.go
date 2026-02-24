@@ -18,6 +18,7 @@ type Shell struct {
 	history      *History
 	agentHandler AgentHandler
 	oldState     *term.State
+	jobs         *JobTable
 }
 
 // New creates a new standalone Shell.
@@ -25,6 +26,7 @@ func New(history *History, agentHandler AgentHandler) *Shell {
 	return &Shell{
 		history:      history,
 		agentHandler: agentHandler,
+		jobs:         NewJobTable(),
 	}
 }
 
@@ -42,9 +44,32 @@ func (s *Shell) runAgent(t *term.Terminal, input string) {
 func (s *Shell) Run() error {
 	fd := int(os.Stdin.Fd())
 
-	// Ignore job-control signals in the shell process so it can perform
-	// terminal operations while child processes are in the foreground.
-	signal.Ignore(syscall.SIGTTOU, syscall.SIGTTIN, syscall.SIGTSTP)
+	// Ignore SIGTTOU and SIGTTIN so the shell can manipulate terminal
+	// process groups freely. SIGTSTP is NOT ignored — we handle it so
+	// we can suspend foreground child processes with Ctrl+Z.
+	signal.Ignore(syscall.SIGTTOU, syscall.SIGTTIN)
+
+	// Set up a channel to receive SIGTSTP (Ctrl+Z). The signal is
+	// delivered to the shell process; we forward it to the child.
+	sigTSTP := make(chan os.Signal, 1)
+	signal.Notify(sigTSTP, syscall.SIGTSTP)
+	defer func() {
+		signal.Stop(sigTSTP)
+		close(sigTSTP)
+	}()
+
+	// Drain SIGTSTP signals that arrive when no foreground job is running.
+	go func() {
+		for range sigTSTP {
+			// If there is a foreground job, send SIGTSTP to its process group.
+			if id := s.jobs.Current(); id != 0 {
+				if j := s.jobs.Get(id); j != nil {
+					_ = j.SendSignal(syscall.SIGTSTP)
+				}
+			}
+			// Otherwise ignore (shell itself should not suspend).
+		}
+	}()
 
 	// Put terminal in raw mode for term.Terminal line editing
 	oldState, err := term.MakeRaw(fd)
@@ -99,6 +124,9 @@ func (s *Shell) Run() error {
 	}
 
 	for {
+		// Before showing the prompt, report any completed background jobs.
+		s.jobs.ReportAndClean()
+
 		line, err := t.ReadLine()
 		if err != nil {
 			// EOF (Ctrl-D) or error — exit
