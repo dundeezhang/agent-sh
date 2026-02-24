@@ -3,22 +3,87 @@ package shell
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"os/user"
 	"strings"
+	"time"
 
 	"golang.org/x/term"
 )
 
-// prompt returns the shell prompt string showing CWD.
-func prompt() string {
-	dir, err := os.Getwd()
-	if err != nil {
-		dir = "?"
-	}
+// abbreviateHome replaces the home directory prefix with ~.
+func abbreviateHome(dir string) string {
 	home, _ := os.UserHomeDir()
 	if home != "" && strings.HasPrefix(dir, home) {
-		dir = "~" + dir[len(home):]
+		return "~" + dir[len(home):]
 	}
-	return fmt.Sprintf("\033[1;34magent-sh\033[0m %s\033[1;34m>\033[0m ", dir)
+	return dir
+}
+
+// gitBranch returns the current git branch name, or an empty string
+// if not in a git repository or on error.
+func gitBranch() string {
+	out, err := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
+// formatPrompt expands escape sequences in the prompt format string.
+//
+// Supported sequences:
+//
+//	%d  current working directory (home abbreviated as ~)
+//	%u  current username
+//	%h  hostname
+//	%t  current time (HH:MM:SS)
+//	%?  last command exit code
+//	%g  current git branch
+//	%%  literal percent sign
+func formatPrompt(format string, lastExitCode int) string {
+	var b strings.Builder
+	b.Grow(len(format))
+
+	for i := 0; i < len(format); i++ {
+		if format[i] != '%' || i+1 >= len(format) {
+			b.WriteByte(format[i])
+			continue
+		}
+
+		// We have a '%' and there's at least one more character.
+		i++
+		switch format[i] {
+		case 'd':
+			dir, err := os.Getwd()
+			if err != nil {
+				dir = "?"
+			}
+			b.WriteString(abbreviateHome(dir))
+		case 'u':
+			if u, err := user.Current(); err == nil {
+				b.WriteString(u.Username)
+			}
+		case 'h':
+			if h, err := os.Hostname(); err == nil {
+				b.WriteString(h)
+			}
+		case 't':
+			b.WriteString(time.Now().Format("15:04:05"))
+		case '?':
+			b.WriteString(fmt.Sprintf("%d", lastExitCode))
+		case 'g':
+			b.WriteString(gitBranch())
+		case '%':
+			b.WriteByte('%')
+		default:
+			// Unknown sequence: preserve as-is.
+			b.WriteByte('%')
+			b.WriteByte(format[i])
+		}
+	}
+
+	return b.String()
 }
 
 // termSize returns the current terminal width and height.

@@ -35,7 +35,7 @@ func (s *Shell) handleBuiltin(line string, t *term.Terminal) bool {
 		if err := os.Chdir(dir); err != nil {
 			fmt.Fprintf(t, "cd: %s\r\n", err)
 		}
-		t.SetPrompt(prompt())
+		t.SetPrompt(s.prompt())
 		return true
 
 	case "export":

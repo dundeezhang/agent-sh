@@ -11,6 +11,7 @@ import (
 type Config struct {
 	API     APIConfig     `toml:"api"`
 	Context ContextConfig `toml:"context"`
+	Prompt  PromptConfig  `toml:"prompt"`
 }
 
 type APIConfig struct {
@@ -25,6 +26,16 @@ type ContextConfig struct {
 	IncludeGit  bool `toml:"include_git"`
 }
 
+// PromptConfig controls the shell prompt appearance.
+type PromptConfig struct {
+	Format      string `toml:"format"`
+	RightFormat string `toml:"right_format"`
+}
+
+// DefaultPromptFormat is the default prompt format matching the original
+// hardcoded prompt: blue "agent-sh", CWD, blue ">".
+const DefaultPromptFormat = "\033[1;34magent-sh\033[0m %d\033[1;34m>\033[0m "
+
 func DefaultConfig() *Config {
 	return &Config{
 		API: APIConfig{
@@ -34,6 +45,9 @@ func DefaultConfig() *Config {
 		Context: ContextConfig{
 			HistorySize: 20,
 			IncludeGit:  true,
+		},
+		Prompt: PromptConfig{
+			Format: DefaultPromptFormat,
 		},
 	}
 }
