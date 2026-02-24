@@ -11,6 +11,11 @@ import (
 type Config struct {
 	API     APIConfig     `toml:"api"`
 	Context ContextConfig `toml:"context"`
+	Shell   ShellConfig   `toml:"shell"`
+}
+
+type ShellConfig struct {
+	EditMode string `toml:"edit_mode"`
 }
 
 type APIConfig struct {
@@ -34,6 +39,9 @@ func DefaultConfig() *Config {
 		Context: ContextConfig{
 			HistorySize: 20,
 			IncludeGit:  true,
+		},
+		Shell: ShellConfig{
+			EditMode: "emacs",
 		},
 	}
 }
@@ -65,6 +73,9 @@ func Load() (*Config, error) {
 	}
 	if model := os.Getenv("AGENT_SH_MODEL"); model != "" {
 		cfg.API.Model = model
+	}
+	if editMode := os.Getenv("AGENT_SH_EDIT_MODE"); editMode != "" {
+		cfg.Shell.EditMode = editMode
 	}
 
 	return cfg, nil
