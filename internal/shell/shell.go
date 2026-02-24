@@ -18,13 +18,31 @@ type Shell struct {
 	history      *History
 	agentHandler AgentHandler
 	oldState     *term.State
+	banner       string
+	showBanner   bool
 }
 
 // New creates a new standalone Shell.
-func New(history *History, agentHandler AgentHandler) *Shell {
-	return &Shell{
+func New(history *History, agentHandler AgentHandler, opts ...Option) *Shell {
+	s := &Shell{
 		history:      history,
 		agentHandler: agentHandler,
+	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
+}
+
+// Option configures a Shell.
+type Option func(*Shell)
+
+// WithBanner configures the startup banner. If show is true and banner is
+// non-empty, the banner is printed once when the shell starts.
+func WithBanner(banner string, show bool) Option {
+	return func(s *Shell) {
+		s.banner = banner
+		s.showBanner = show
 	}
 }
 
@@ -70,6 +88,10 @@ func (s *Shell) Run() error {
 			t.SetSize(termSize())
 		}
 	}()
+
+	if s.showBanner && s.banner != "" {
+		fmt.Fprintf(t, "\033[2m%s\033[0m\n", s.banner)
+	}
 
 	t.AutoCompleteCallback = func(line string, pos int, key rune) (string, int, bool) {
 		if key != '\t' {
