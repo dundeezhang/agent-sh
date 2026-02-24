@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -18,6 +19,7 @@ type Shell struct {
 	history      *History
 	agentHandler AgentHandler
 	oldState     *term.State
+	lastExitCode int
 }
 
 // New creates a new standalone Shell.
@@ -34,8 +36,9 @@ func New(history *History, agentHandler AgentHandler) *Shell {
 func (s *Shell) runAgent(t *term.Terminal, input string) {
 	s.restore()
 	s.agentHandler(input)
+	s.lastExitCode = 0
 	s.rawMode()
-	t.SetPrompt(prompt())
+	t.SetPrompt(prompt(s.lastExitCode))
 }
 
 // Run starts the shell REPL and blocks until exit.
@@ -54,7 +57,7 @@ func (s *Shell) Run() error {
 	s.oldState = oldState
 	defer s.restore()
 
-	t := term.NewTerminal(os.Stdin, prompt())
+	t := term.NewTerminal(os.Stdin, prompt(s.lastExitCode))
 	// Wire stdout through the terminal so output is properly \r\n translated
 	t.SetSize(termSize())
 
@@ -111,6 +114,9 @@ func (s *Shell) Run() error {
 			continue
 		}
 
+		// Expand $? to the last exit code before any processing.
+		line = expandExitCode(line, strconv.Itoa(s.lastExitCode))
+
 		// @ detection
 		forceBash := false
 		if strings.HasPrefix(line, "@") {
@@ -134,8 +140,10 @@ func (s *Shell) Run() error {
 		}
 
 		// Builtins
-		if s.handleBuiltin(line, t) {
+		if handled, code := s.handleBuiltin(line, t); handled {
+			s.lastExitCode = code
 			s.history.Add(line)
+			t.SetPrompt(prompt(s.lastExitCode))
 			continue
 		}
 
@@ -154,11 +162,14 @@ func (s *Shell) Run() error {
 
 		// Execute as shell command; exit-127 fallback sends to agent.
 		s.restore()
-		if exitCode := s.execCommand(line); exitCode == 127 && !forceBash {
+		exitCode := s.execCommand(line)
+		s.lastExitCode = exitCode
+		if exitCode == 127 && !forceBash {
 			fmt.Fprintf(os.Stderr, "command not found, asking AI...\n")
 			s.agentHandler(line)
+			s.lastExitCode = 0
 		}
 		s.rawMode()
-		t.SetPrompt(prompt())
+		t.SetPrompt(prompt(s.lastExitCode))
 	}
 }

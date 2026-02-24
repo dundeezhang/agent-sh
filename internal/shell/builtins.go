@@ -8,18 +8,19 @@ import (
 	"golang.org/x/term"
 )
 
-// handleBuiltin returns true if the line was a builtin command.
-func (s *Shell) handleBuiltin(line string, t *term.Terminal) bool {
+// handleBuiltin returns (handled, exitCode). handled is true if the line was
+// a builtin command; exitCode is 0 on success, non-zero on failure.
+func (s *Shell) handleBuiltin(line string, t *term.Terminal) (bool, int) {
 	parts := strings.Fields(line)
 	if len(parts) == 0 {
-		return false
+		return false, 0
 	}
 
 	switch parts[0] {
 	case "exit":
 		s.restore()
 		os.Exit(0)
-		return true
+		return true, 0
 
 	case "cd":
 		dir := ""
@@ -34,33 +35,34 @@ func (s *Shell) handleBuiltin(line string, t *term.Terminal) bool {
 		}
 		if err := os.Chdir(dir); err != nil {
 			fmt.Fprintf(t, "cd: %s\r\n", err)
+			return true, 1
 		}
-		t.SetPrompt(prompt())
-		return true
+		t.SetPrompt(prompt(s.lastExitCode))
+		return true, 0
 
 	case "export":
 		if len(parts) < 2 {
-			return true
+			return true, 0
 		}
 		for _, arg := range parts[1:] {
 			if idx := strings.Index(arg, "="); idx >= 0 {
 				os.Setenv(arg[:idx], arg[idx+1:])
 			}
 		}
-		return true
+		return true, 0
 
 	case "env":
 		for _, e := range os.Environ() {
 			fmt.Fprintf(t, "%s\r\n", e)
 		}
-		return true
+		return true, 0
 
 	case "history":
 		for i, cmd := range s.history.Recent(0) {
 			fmt.Fprintf(t, "%4d  %s\r\n", i+1, cmd)
 		}
-		return true
+		return true, 0
 	}
 
-	return false
+	return false, 0
 }
