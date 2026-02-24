@@ -77,3 +77,12 @@ func configDir() (string, error) {
 	}
 	return filepath.Join(home, ".config", "agent-sh"), nil
 }
+
+// RCFilePath returns the path to the RC (init) file: ~/.config/agent-sh/init.sh.
+func RCFilePath() string {
+	dir, err := configDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(dir, "init.sh")
+}
