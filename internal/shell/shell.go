@@ -72,6 +72,14 @@ func (s *Shell) Run() error {
 	}()
 
 	t.AutoCompleteCallback = func(line string, pos int, key rune) (string, int, bool) {
+		if key == rune(keyCtrlR) {
+			result, ok := s.reverseSearch()
+			if ok {
+				return result, len(result), true
+			}
+			// Cancelled — redisplay the current line unchanged.
+			return line, pos, true
+		}
 		if key != '\t' {
 			return "", 0, false
 		}
