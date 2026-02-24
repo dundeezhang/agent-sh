@@ -21,8 +21,9 @@ type APIConfig struct {
 }
 
 type ContextConfig struct {
-	HistorySize int  `toml:"history_size"`
-	IncludeGit  bool `toml:"include_git"`
+	HistorySize int    `toml:"history_size"`
+	HistoryFile string `toml:"history_file"`
+	IncludeGit  bool   `toml:"include_git"`
 }
 
 func DefaultConfig() *Config {
