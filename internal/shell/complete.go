@@ -8,13 +8,14 @@ import (
 )
 
 // builtins that the shell handles directly.
-var shellBuiltins = []string{"cd", "env", "exit", "export", "history"}
+var shellBuiltins = []string{"alias", "cd", "env", "exit", "export", "history", "unalias"}
 
 // completeWord extracts the word at the cursor and returns possible completions.
 // When the cursor is on the first token and it contains no path separator,
-// it completes command names (PATH executables + builtins). Otherwise it
-// completes file/directory names.
-func completeWord(line string, pos int) (wordStart int, prefix string, matches []string) {
+// it completes command names (PATH executables + builtins + aliases).
+// Otherwise it completes file/directory names.
+// The aliasNames parameter provides alias names for command completion.
+func completeWord(line string, pos int, aliasNames ...string) (wordStart int, prefix string, matches []string) {
 	// Find start of the current word (scan backwards from cursor for whitespace).
 	left := line[:pos]
 	wordStart = strings.LastIndexAny(left, " \t") + 1 // 0 if no space found
@@ -25,7 +26,7 @@ func completeWord(line string, pos int) (wordStart int, prefix string, matches [
 
 	// If it's the command word and doesn't contain a path separator, complete commands.
 	if isCommand && !strings.Contains(prefix, "/") && !strings.HasPrefix(prefix, "~") {
-		matches = completeCommand(prefix)
+		matches = completeCommand(prefix, aliasNames...)
 		return wordStart, prefix, matches
 	}
 
@@ -33,8 +34,8 @@ func completeWord(line string, pos int) (wordStart int, prefix string, matches [
 	return wordStart, prefix, matches
 }
 
-// completeCommand returns executables from $PATH and builtins matching prefix.
-func completeCommand(prefix string) []string {
+// completeCommand returns executables from $PATH, builtins, and aliases matching prefix.
+func completeCommand(prefix string, aliasNames ...string) []string {
 	if prefix == "" {
 		return nil
 	}
@@ -47,6 +48,14 @@ func completeCommand(prefix string) []string {
 		if strings.HasPrefix(b, prefix) {
 			seen[b] = true
 			matches = append(matches, b)
+		}
+	}
+
+	// Aliases.
+	for _, name := range aliasNames {
+		if !seen[name] && strings.HasPrefix(name, prefix) {
+			seen[name] = true
+			matches = append(matches, name)
 		}
 	}
 
