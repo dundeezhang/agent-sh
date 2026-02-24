@@ -7,14 +7,26 @@ import (
 	"strings"
 )
 
+// defaultRegistry is the global completion registry initialised at startup.
+var defaultRegistry = NewCompletionRegistry()
+
 // builtins that the shell handles directly.
 var shellBuiltins = []string{"cd", "env", "exit", "export", "history"}
 
 // completeWord extracts the word at the cursor and returns possible completions.
 // When the cursor is on the first token and it contains no path separator,
-// it completes command names (PATH executables + builtins). Otherwise it
-// completes file/directory names.
+// it completes command names (PATH executables + builtins). For subsequent
+// tokens it checks, in order:
+//  1. Environment variable completion (prefix starts with $)
+//  2. Registered command-specific completers (subcommands, flags)
+//  3. File/directory name completion (default fallback)
 func completeWord(line string, pos int) (wordStart int, prefix string, matches []string) {
+	return completeWordWithRegistry(line, pos, defaultRegistry)
+}
+
+// completeWordWithRegistry is the registry-aware implementation of
+// completeWord. Passing nil for reg disables programmable completion.
+func completeWordWithRegistry(line string, pos int, reg *CompletionRegistry) (wordStart int, prefix string, matches []string) {
 	// Find start of the current word (scan backwards from cursor for whitespace).
 	left := line[:pos]
 	wordStart = strings.LastIndexAny(left, " \t") + 1 // 0 if no space found
@@ -27,6 +39,28 @@ func completeWord(line string, pos int) (wordStart int, prefix string, matches [
 	if isCommand && !strings.Contains(prefix, "/") && !strings.HasPrefix(prefix, "~") {
 		matches = completeCommand(prefix)
 		return wordStart, prefix, matches
+	}
+
+	// --- Argument-position completion ---
+
+	// Environment variable completion: $FOO<TAB>
+	if strings.HasPrefix(prefix, "$") {
+		matches = completeEnvVar(prefix)
+		return wordStart, prefix, matches
+	}
+
+	// Parse the command name and preceding arguments from the line.
+	tokens := strings.Fields(left[:wordStart])
+	if reg != nil && len(tokens) > 0 {
+		cmdName := tokens[0]
+		cmdArgs := tokens[1:] // arguments between the command and the current word
+		if c := reg.Lookup(cmdName); c != nil {
+			matches = c(cmdArgs, prefix)
+			if len(matches) > 0 {
+				return wordStart, prefix, matches
+			}
+			// If the completer returned nothing, fall through to file completion.
+		}
 	}
 
 	matches = completeFile(prefix)
