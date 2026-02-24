@@ -95,7 +95,7 @@ func main() {
 				fmt.Fprintf(os.Stderr, "warning: writing context: %s\n", err)
 			}
 		}
-	})
+	}, cfg.Prompt.Format)
 
 	fmt.Printf("agent-sh v%s (AI auto-detects natural language · @ forces AI · @@ forces bash)\n", version)
 

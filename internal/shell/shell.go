@@ -18,14 +18,22 @@ type Shell struct {
 	history      *History
 	agentHandler AgentHandler
 	oldState     *term.State
+	promptFormat string
+	lastExitCode int
 }
 
 // New creates a new standalone Shell.
-func New(history *History, agentHandler AgentHandler) *Shell {
+func New(history *History, agentHandler AgentHandler, promptFormat string) *Shell {
 	return &Shell{
 		history:      history,
 		agentHandler: agentHandler,
+		promptFormat: promptFormat,
 	}
+}
+
+// prompt returns the formatted prompt string using the configured format.
+func (s *Shell) prompt() string {
+	return formatPrompt(s.promptFormat, s.lastExitCode)
 }
 
 // runAgent restores cooked mode, calls the agent handler, then re-enters
@@ -35,7 +43,7 @@ func (s *Shell) runAgent(t *term.Terminal, input string) {
 	s.restore()
 	s.agentHandler(input)
 	s.rawMode()
-	t.SetPrompt(prompt())
+	t.SetPrompt(s.prompt())
 }
 
 // Run starts the shell REPL and blocks until exit.
@@ -54,7 +62,7 @@ func (s *Shell) Run() error {
 	s.oldState = oldState
 	defer s.restore()
 
-	t := term.NewTerminal(os.Stdin, prompt())
+	t := term.NewTerminal(os.Stdin, s.prompt())
 	// Wire stdout through the terminal so output is properly \r\n translated
 	t.SetSize(termSize())
 
@@ -154,11 +162,13 @@ func (s *Shell) Run() error {
 
 		// Execute as shell command; exit-127 fallback sends to agent.
 		s.restore()
-		if exitCode := s.execCommand(line); exitCode == 127 && !forceBash {
+		exitCode := s.execCommand(line)
+		s.lastExitCode = exitCode
+		if exitCode == 127 && !forceBash {
 			fmt.Fprintf(os.Stderr, "command not found, asking AI...\n")
 			s.agentHandler(line)
 		}
 		s.rawMode()
-		t.SetPrompt(prompt())
+		t.SetPrompt(s.prompt())
 	}
 }
