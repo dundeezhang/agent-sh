@@ -8,7 +8,7 @@ import (
 )
 
 // builtins that the shell handles directly.
-var shellBuiltins = []string{"cd", "env", "exit", "export", "history"}
+var shellBuiltins = []string{"cd", "dirs", "env", "exit", "export", "history", "popd", "pushd"}
 
 // completeWord extracts the word at the cursor and returns possible completions.
 // When the cursor is on the first token and it contains no path separator,

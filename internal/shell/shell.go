@@ -16,6 +16,7 @@ type AgentHandler func(input string)
 // Shell is a standalone read-eval-execute loop.
 type Shell struct {
 	history      *History
+	dirStack     *DirStack
 	agentHandler AgentHandler
 	oldState     *term.State
 }
@@ -24,6 +25,7 @@ type Shell struct {
 func New(history *History, agentHandler AgentHandler) *Shell {
 	return &Shell{
 		history:      history,
+		dirStack:     NewDirStack(),
 		agentHandler: agentHandler,
 	}
 }
