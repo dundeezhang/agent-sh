@@ -1,9 +1,9 @@
-# agent-sh
+# agent-sh (WIP)
 
 [![CodeFactor](https://www.codefactor.io/repository/github/dundeezhang/agent-sh/badge)](https://www.codefactor.io/repository/github/dundeezhang/agent-sh)
 ![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/dundeezhang/agent-sh?utm_source=oss&utm_medium=github&utm_campaign=dundeezhang%2Fagent-sh&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 
-An AI-powered terminal shell. Use your shell as usual, and prefix any command with `@` to invoke an AI agent that can execute commands, read and write files, search code, and more.
+An AI-powered terminal shell. Use your shell as usual, and prefix any command with `@` to invoke an AI agent that can execute commands, read and write files, search code, and more. Natural language is automatically detected, so you can often skip the `@` prefix entirely.
 
 Supports **Anthropic Claude**, **OpenAI**, and **Ollama** as LLM backends.
 
@@ -44,7 +44,17 @@ agent-sh ~/project> @ find all TODO comments in the codebase
 agent-sh ~/project> @ refactor main.go to split the handler into separate functions
 ```
 
-Use `@@` to run a literal command starting with `@`.
+## Smart Command Detection
+
+agent-sh automatically classifies your input as either a shell command or a natural language query using heuristic analysis. You often don't need the `@` prefix at all:
+
+```text
+agent-sh ~/project> find all TODO comments       # detected as natural language → agent
+agent-sh ~/project> ls -la                        # detected as shell command → executed
+agent-sh ~/project> what does main.go do          # detected as natural language → agent
+```
+
+If a command is not found (exit code 127), agent-sh automatically retries it as an AI query. Use `@@` to force a literal command starting with `@`.
 
 ## Agent Tools
 
@@ -61,7 +71,21 @@ The AI agent has access to the following tools:
 | `web_search` | Search the web via DuckDuckGo for docs, examples, and references |
 | `web_fetch` | Fetch a URL and extract readable text content |
 
-The agent runs in a loop of up to 25 turns, deciding which tools to call until the task is complete. Bash commands always require explicit user confirmation before execution.
+The agent runs in a loop of up to 25 turns, deciding which tools to call until the task is complete.
+
+### Command Safety
+
+Bash commands executed by the agent go through a safety check:
+
+- **Read-only commands** (`ls`, `cat`, `git status`, `git log`, etc.) are **auto-approved** and run without prompting.
+- **Mutating commands** (installations, file writes, destructive operations) require **explicit confirmation**.
+- At the confirmation prompt, press **Enter** (yes), **n** (no), or **a** (auto-approve all commands for the session).
+- Pipelines are only auto-approved if every command in the pipeline is read-only.
+- Web fetch includes SSRF protection, blocking requests to localhost and private IPs.
+
+## Markdown Rendering
+
+Agent responses are rendered with ANSI styling in the terminal: **bold**, *italic*, `inline code`, and fenced code blocks are all styled for readability. A loading spinner with token usage stats is shown while the agent is thinking.
 
 ## Per-Directory Memory
 
@@ -124,7 +148,9 @@ agent-sh -version             # print version
 | `env` | List environment variables |
 | `history` | Show command history |
 
-Tab completion is supported for commands (from PATH and built-ins) and file paths.
+Tab completion is supported for commands (from PATH and built-ins) and file paths. Multiple matches are displayed in columns, and directories get a trailing slash.
+
+Interactive programs like `vim`, `less`, and `top` work correctly — agent-sh transfers terminal control to child processes and restores it when they exit.
 
 ## Building
 
