@@ -105,6 +105,8 @@ func main() {
 	}
 }
 
+const ollamaDefaultBaseURL = "http://localhost:11434/v1"
+
 func initProvider(cfg *config.Config) (provider.Provider, error) {
 	switch cfg.API.Provider {
 	case "anthropic":
@@ -112,13 +114,15 @@ func initProvider(cfg *config.Config) (provider.Provider, error) {
 			return nil, fmt.Errorf("anthropic API key required: set ANTHROPIC_API_KEY or configure in ~/.config/agent-sh/config.toml")
 		}
 		return provider.NewAnthropic(cfg.API.Key), nil
-	case "openai", "ollama":
-		if cfg.API.Key == "" && os.Getenv("OPENAI_API_KEY") == "" && cfg.API.Provider != "ollama" {
+	case "openai":
+		if cfg.API.Key == "" && os.Getenv("OPENAI_API_KEY") == "" {
 			return nil, fmt.Errorf("OpenAI API key required: set OPENAI_API_KEY or configure in ~/.config/agent-sh/config.toml")
 		}
+		return provider.NewOpenAI(cfg.API.Key, cfg.API.BaseURL), nil
+	case "ollama":
 		baseURL := cfg.API.BaseURL
-		if cfg.API.Provider == "ollama" && baseURL == "" {
-			baseURL = "http://localhost:11434/v1"
+		if baseURL == "" {
+			baseURL = ollamaDefaultBaseURL
 		}
 		return provider.NewOpenAI(cfg.API.Key, baseURL), nil
 	default:

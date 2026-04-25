@@ -56,7 +56,10 @@ func (a *Anthropic) Stream(ctx context.Context, params StreamParams) (*Response,
 				blocks = append(blocks, anthropic.NewTextBlock(cb.Text))
 			case "tool_use":
 				if cb.ToolUse != nil {
-					inputJSON, _ := json.Marshal(cb.ToolUse.Input)
+					inputJSON, err := json.Marshal(cb.ToolUse.Input)
+					if err != nil {
+						return nil, fmt.Errorf("anthropic: marshal tool input for %q: %w", cb.ToolUse.Name, err)
+					}
 					blocks = append(blocks, anthropic.ContentBlockParamUnion{
 						OfToolUse: &anthropic.ToolUseBlockParam{
 							ID:    cb.ToolUse.ID,
@@ -152,7 +155,9 @@ func (a *Anthropic) Stream(ctx context.Context, params StreamParams) (*Response,
 		case "content_block_stop":
 			if currentToolUse != nil {
 				if toolInputJSON.Len() > 0 {
-					_ = json.Unmarshal([]byte(toolInputJSON.String()), &currentToolUse.Input)
+					if err := json.Unmarshal([]byte(toolInputJSON.String()), &currentToolUse.Input); err != nil {
+						return nil, fmt.Errorf("anthropic: malformed tool call JSON for %q: %w", currentToolUse.Name, err)
+					}
 				}
 				resp.Content = append(resp.Content, ContentBlock{
 					Type:    "tool_use",

@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/dundeezhang/agent-sh/internal/provider"
+	"github.com/dundeezhang/agent-sh/internal/render"
 )
 
 // ToolCallRecord captures a single tool invocation during an agent run.
@@ -20,7 +21,7 @@ type InteractionResult struct {
 	Summary   string
 }
 
-// extractText pulls the concatenated text from response content blocks.
+// extractText returns the concatenated text from response content blocks.
 func extractText(blocks []provider.ContentBlock) string {
 	var sb strings.Builder
 	for _, b := range blocks {
@@ -31,38 +32,11 @@ func extractText(blocks []provider.ContentBlock) string {
 	return sb.String()
 }
 
-// toolDisplayKey maps tool names to the key holding their most descriptive argument.
-var toolDisplayKey = map[string]string{
-	"bash":       "command",
-	"read_file":  "path",
-	"write_file": "path",
-	"edit_file":  "path",
-	"search":     "pattern",
-	"glob":       "pattern",
-	"web_search": "query",
-	"web_fetch":  "url",
-}
-
-// extractToolInput returns a short string describing the primary input arg.
-func extractToolInput(name string, input map[string]interface{}) string {
-	key := toolDisplayKey[name]
-	if key == "" {
-		key = "command"
-	}
-	v, ok := input[key]
-	if !ok {
-		// Fallback: grab first string value.
-		for _, val := range input {
-			if s, ok := val.(string); ok {
-				return truncate(s, 100)
-			}
-		}
-		return ""
-	}
-	if s, ok := v.(string); ok {
-		return truncate(s, 100)
-	}
-	return ""
+// summarizeToolInput returns a short, descriptive string for a tool call,
+// suitable for surfacing in memory or logs. Returns "" if the tool's
+// display key is not registered or absent from the input.
+func summarizeToolInput(name string, input map[string]interface{}) string {
+	return render.Truncate(render.ToolDisplayValue(name, input), 100)
 }
 
 // buildResult constructs an InteractionResult from the collected data.
@@ -70,17 +44,6 @@ func buildResult(query string, toolCalls []ToolCallRecord, lastText string) *Int
 	return &InteractionResult{
 		Query:     query,
 		ToolCalls: toolCalls,
-		Summary:   truncate(lastText, 500),
+		Summary:   render.Truncate(lastText, 500),
 	}
-}
-
-func truncate(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	runes := []rune(s)
-	if len(runes) <= maxLen {
-		return s
-	}
-	return string(runes[:maxLen])
 }

@@ -94,12 +94,7 @@ func completeCommand(prefix string) []string {
 
 // completeFile returns file/directory names matching prefix.
 func completeFile(prefix string) []string {
-	// Expand ~ at the start of the prefix for filesystem operations.
-	expanded := prefix
-	home, _ := os.UserHomeDir()
-	if home != "" && strings.HasPrefix(expanded, "~") {
-		expanded = home + expanded[1:]
-	}
+	expanded := expandHome(prefix)
 
 	// Extract the directory prefix from the original input by finding the
 	// last path separator, preserving prefixes like ./, ../, /path/to/.

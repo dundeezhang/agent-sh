@@ -88,7 +88,10 @@ func (o *OpenAI) Stream(ctx context.Context, params StreamParams) (*Response, er
 				oaiMsg.Content = cb.Text
 			case "tool_use":
 				if cb.ToolUse != nil {
-					inputJSON, _ := json.Marshal(cb.ToolUse.Input)
+					inputJSON, err := json.Marshal(cb.ToolUse.Input)
+					if err != nil {
+						return nil, fmt.Errorf("openai: marshal tool input for %q: %w", cb.ToolUse.Name, err)
+					}
 					oaiMsg.ToolCalls = append(oaiMsg.ToolCalls, openai.ToolCall{
 						ID:   cb.ToolUse.ID,
 						Type: openai.ToolTypeFunction,
