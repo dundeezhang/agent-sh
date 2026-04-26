@@ -2,6 +2,7 @@ package shell
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -23,11 +24,20 @@ func expandHome(p string) string {
 }
 
 // collapseHome is the inverse of expandHome: replaces a leading home path
-// with "~" for display.
+// with "~" for display. Only collapses when p is exactly the home directory
+// or a path inside it — never on a sibling path that merely shares a prefix
+// (e.g. "/home/userfoo" must not become "~foo" when home is "/home/user").
 func collapseHome(p string) string {
 	home, err := os.UserHomeDir()
-	if err != nil || home == "" || !strings.HasPrefix(p, home) {
+	if err != nil || home == "" {
 		return p
 	}
-	return "~" + p[len(home):]
+	if p == home {
+		return "~"
+	}
+	sep := string(filepath.Separator)
+	if strings.HasPrefix(p, home+sep) {
+		return "~" + p[len(home):]
+	}
+	return p
 }
