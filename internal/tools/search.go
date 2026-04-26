@@ -15,7 +15,7 @@ import (
 func (r *Registry) registerSearch() {
 	r.register("search", provider.Tool{
 		Name:        "search",
-		Description: "Search for a regex pattern in files using ripgrep (rg). Falls back to grep if rg is not installed. Returns matching lines with file paths and line numbers.",
+		Description: "Search for a regex pattern in files using ripgrep (rg). Returns matching lines with file paths and line numbers. Requires ripgrep to be installed.",
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
@@ -59,22 +59,16 @@ func (r *Registry) registerGlob() {
 }
 
 func executeSearch(input map[string]interface{}) ToolResult {
-	pattern, ok := input["pattern"].(string)
-	if !ok || pattern == "" {
+	pattern, _ := input["pattern"].(string)
+	if pattern == "" {
 		return ToolResult{Content: "pattern is required", IsError: true}
 	}
-
-	searchPath := "."
-	if p, ok := input["path"].(string); ok && p != "" {
-		searchPath = p
+	searchPath, _ := input["path"].(string)
+	if searchPath == "" {
+		searchPath = "."
 	}
+	globFilter, _ := input["glob"].(string)
 
-	globFilter := ""
-	if g, ok := input["glob"].(string); ok && g != "" {
-		globFilter = g
-	}
-
-	// Try ripgrep first
 	args := []string{"-n", "--no-heading", "--color=never"}
 	if globFilter != "" {
 		args = append(args, "--glob", globFilter)
@@ -88,12 +82,11 @@ func executeSearch(input map[string]interface{}) ToolResult {
 
 	err := cmd.Run()
 	if err != nil {
-		// Check if rg is not found — fall back to grep
 		var execErr *exec.Error
 		if errors.As(err, &execErr) && errors.Is(execErr.Err, exec.ErrNotFound) {
-			return executeSearchGrep(pattern, searchPath, globFilter)
+			return ToolResult{Content: "search requires ripgrep (rg) to be installed", IsError: true}
 		}
-		// Exit code 1 means no matches (not an error)
+		// Exit code 1 means no matches — not an error.
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
 			return ToolResult{Content: "no matches found"}
@@ -101,36 +94,7 @@ func executeSearch(input map[string]interface{}) ToolResult {
 		if stderr.Len() > 0 {
 			return ToolResult{Content: stderr.String(), IsError: true}
 		}
-	}
-
-	output := stdout.String()
-	if output == "" {
-		return ToolResult{Content: "no matches found"}
-	}
-	return ToolResult{Content: output}
-}
-
-func executeSearchGrep(pattern, path, globFilter string) ToolResult {
-	args := []string{"-rn", "--color=never"}
-	if globFilter != "" {
-		args = append(args, "--include", globFilter)
-	}
-	args = append(args, pattern, path)
-
-	var stdout, stderr bytes.Buffer
-	cmd := exec.Command("grep", args...)
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	err := cmd.Run()
-	if err != nil {
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
-			return ToolResult{Content: "no matches found"}
-		}
-		if stderr.Len() > 0 {
-			return ToolResult{Content: stderr.String(), IsError: true}
-		}
+		return ToolResult{Content: err.Error(), IsError: true}
 	}
 
 	output := stdout.String()
@@ -141,25 +105,21 @@ func executeSearchGrep(pattern, path, globFilter string) ToolResult {
 }
 
 func executeGlob(input map[string]interface{}) ToolResult {
-	pattern, ok := input["pattern"].(string)
-	if !ok || pattern == "" {
+	pattern, _ := input["pattern"].(string)
+	if pattern == "" {
 		return ToolResult{Content: "pattern is required", IsError: true}
 	}
-
-	basePath := "."
-	if p, ok := input["path"].(string); ok && p != "" {
-		basePath = p
+	basePath, _ := input["path"].(string)
+	if basePath == "" {
+		basePath = "."
 	}
 
-	fullPattern := filepath.Join(basePath, pattern)
-	matches, err := doublestar.FilepathGlob(fullPattern)
+	matches, err := doublestar.FilepathGlob(filepath.Join(basePath, pattern))
 	if err != nil {
 		return ToolResult{Content: fmt.Sprintf("glob error: %s", err), IsError: true}
 	}
-
 	if len(matches) == 0 {
 		return ToolResult{Content: "no files matched"}
 	}
-
 	return ToolResult{Content: strings.Join(matches, "\n")}
 }

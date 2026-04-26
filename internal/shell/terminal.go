@@ -3,7 +3,6 @@ package shell
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"golang.org/x/term"
 )
@@ -14,11 +13,7 @@ func prompt() string {
 	if err != nil {
 		dir = "?"
 	}
-	home, _ := os.UserHomeDir()
-	if home != "" && strings.HasPrefix(dir, home) {
-		dir = "~" + dir[len(home):]
-	}
-	return fmt.Sprintf("\033[1;34magent-sh\033[0m %s\033[1;34m>\033[0m ", dir)
+	return fmt.Sprintf("\033[1;34magent-sh\033[0m %s\033[1;34m>\033[0m ", collapseHome(dir))
 }
 
 // termSize returns the current terminal width and height.

@@ -26,13 +26,7 @@ func (s *Shell) handleBuiltin(line string, t *term.Terminal) bool {
 		if len(parts) > 1 {
 			dir = parts[1]
 		}
-		if dir == "" || dir == "~" {
-			dir, _ = os.UserHomeDir()
-		} else if strings.HasPrefix(dir, "~/") {
-			home, _ := os.UserHomeDir()
-			dir = home + dir[1:]
-		}
-		if err := os.Chdir(dir); err != nil {
+		if err := os.Chdir(expandHome(dir)); err != nil {
 			fmt.Fprintf(t, "cd: %s\r\n", err)
 		}
 		t.SetPrompt(prompt())

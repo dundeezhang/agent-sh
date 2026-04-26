@@ -3,7 +3,6 @@ package agent
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/dundeezhang/agent-sh/internal/provider"
@@ -46,10 +45,8 @@ func (a *Agent) Run(query string, recentCommands []string, previousContext strin
 
 	messages := []provider.Message{
 		{
-			Role: "user",
-			Content: []provider.ContentBlock{
-				{Type: "text", Text: query},
-			},
+			Role:    "user",
+			Content: []provider.ContentBlock{{Type: "text", Text: query}},
 		},
 	}
 
@@ -58,95 +55,45 @@ func (a *Agent) Run(query string, recentCommands []string, previousContext strin
 
 	for turn := 0; turn < maxTurns; turn++ {
 		a.renderer.StartSpinner("Thinking...")
+		sw := a.renderer.Stream()
 
-		// MarkdownWriter is intentionally created per turn: it tracks whether
-		// we are inside a fenced code block (inCode) and buffers partial lines,
-		// so reusing one across turns would let stale state from a previous
-		// response corrupt the rendering of the next.
-		mdw := render.NewMarkdownWriter(os.Stdout)
-
-		var writeErr error
 		resp, err := a.provider.Stream(ctx, provider.StreamParams{
-			Model:     a.model,
-			System:    systemPrompt,
-			Messages:  messages,
-			Tools:     a.registry.Tools(),
-			MaxTokens: 8192,
-			OnTextDelta: func(text string) {
-				a.renderer.StopSpinner()
-				if _, werr := fmt.Fprint(mdw, text); werr != nil && writeErr == nil {
-					writeErr = werr
-				}
-			},
-			OnToolStart: func(name string) {
-				a.renderer.StopSpinner()
-			},
+			Model:       a.model,
+			System:      systemPrompt,
+			Messages:    messages,
+			Tools:       a.registry.Tools(),
+			MaxTokens:   8192,
+			OnTextDelta: sw.Text,
+			OnToolStart: sw.ToolStart,
 		})
-
-		if ferr := mdw.Flush(); ferr != nil && writeErr == nil {
-			writeErr = ferr
-		}
 		a.renderer.StopSpinner()
 
-		if writeErr != nil {
+		if writeErr := sw.Flush(); writeErr != nil {
 			a.renderer.Error(fmt.Sprintf("Error writing output: %s", writeErr))
 			return buildResult(query, toolCallRecords, lastAssistantText)
 		}
-
 		if err != nil {
 			a.renderer.Error(fmt.Sprintf("Error: %s", err))
 			return buildResult(query, toolCallRecords, lastAssistantText)
 		}
 
-		// Capture assistant text
 		if t := extractText(resp.Content); t != "" {
 			lastAssistantText = t
 		}
 
-		// Build assistant message from response
 		messages = append(messages, provider.Message{
 			Role:    "assistant",
 			Content: resp.Content,
 		})
 
-		// If end of turn, we're done
+		// End of turn — model produced a final response.
 		if resp.StopReason != "tool_use" {
-			_, _ = fmt.Fprintln(os.Stdout)
+			a.renderer.Newline()
 			a.renderer.Usage(resp.Usage)
 			return buildResult(query, toolCallRecords, lastAssistantText)
 		}
 
-		// Execute tool calls
-		var toolResults []provider.ContentBlock
-		for _, block := range resp.Content {
-			if block.Type != "tool_use" || block.ToolUse == nil {
-				continue
-			}
-
-			tu := block.ToolUse
-			a.renderer.ToolCall(tu.Name, tu.Input)
-
-			result := a.executeTool(tu)
-
-			a.renderer.ToolResult(tu.Name, result.Content, result.IsError)
-
-			toolCallRecords = append(toolCallRecords, ToolCallRecord{
-				Tool:    tu.Name,
-				Input:   extractToolInput(tu.Name, tu.Input),
-				IsError: result.IsError,
-			})
-
-			toolResults = append(toolResults, provider.ContentBlock{
-				Type: "tool_result",
-				ToolResult: &provider.ToolResult{
-					ToolUseID: tu.ID,
-					Content:   result.Content,
-					IsError:   result.IsError,
-				},
-			})
-		}
-
-		// Add tool results as user message
+		toolResults := a.runToolCalls(resp.Content, &toolCallRecords)
 		messages = append(messages, provider.Message{
 			Role:    "user",
 			Content: toolResults,
@@ -155,6 +102,38 @@ func (a *Agent) Run(query string, recentCommands []string, previousContext strin
 
 	a.renderer.Error(fmt.Sprintf("Agent stopped after %d turns (safety limit)", maxTurns))
 	return buildResult(query, toolCallRecords, lastAssistantText)
+}
+
+// runToolCalls executes every tool_use block in content, rendering progress
+// and collecting tool_result blocks plus a record for each call.
+func (a *Agent) runToolCalls(content []provider.ContentBlock, records *[]ToolCallRecord) []provider.ContentBlock {
+	var toolResults []provider.ContentBlock
+	for _, block := range content {
+		if block.Type != "tool_use" || block.ToolUse == nil {
+			continue
+		}
+		tu := block.ToolUse
+
+		a.renderer.ToolCall(tu.Name, tu.Input)
+		result := a.executeTool(tu)
+		a.renderer.ToolResult(tu.Name, result.Content, result.IsError)
+
+		*records = append(*records, ToolCallRecord{
+			Tool:    tu.Name,
+			Input:   summarizeToolInput(tu.Name, tu.Input),
+			IsError: result.IsError,
+		})
+
+		toolResults = append(toolResults, provider.ContentBlock{
+			Type: "tool_result",
+			ToolResult: &provider.ToolResult{
+				ToolUseID: tu.ID,
+				Content:   result.Content,
+				IsError:   result.IsError,
+			},
+		})
+	}
+	return toolResults
 }
 
 // executeTool runs a single tool call, with bash-specific safety checks.
