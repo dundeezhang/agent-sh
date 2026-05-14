@@ -111,6 +111,15 @@ func (s *Shell) Run() error {
 			continue
 		}
 
+		// History expansion: expand !!, !$, !n, !-n, !string, ^old^new.
+		if expanded, changed, err := ExpandHistory(line, s.history); err != nil {
+			fmt.Fprintf(t, "%s\r\n", err)
+			continue
+		} else if changed {
+			line = expanded
+			fmt.Fprintf(t, "%s\r\n", line)
+		}
+
 		// @ detection
 		forceBash := false
 		if strings.HasPrefix(line, "@") {
