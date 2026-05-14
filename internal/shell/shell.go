@@ -16,6 +16,7 @@ type AgentHandler func(input string)
 // Shell is a standalone read-eval-execute loop.
 type Shell struct {
 	history      *History
+	aliases      *AliasMap
 	agentHandler AgentHandler
 	oldState     *term.State
 }
@@ -24,6 +25,7 @@ type Shell struct {
 func New(history *History, agentHandler AgentHandler) *Shell {
 	return &Shell{
 		history:      history,
+		aliases:      NewAliasMap(),
 		agentHandler: agentHandler,
 	}
 }
@@ -75,7 +77,7 @@ func (s *Shell) Run() error {
 		if key != '\t' {
 			return "", 0, false
 		}
-		wordStart, _, matches := completeWord(line, pos)
+		wordStart, _, matches := completeWord(line, pos, s.aliases.Names()...)
 		if len(matches) == 0 {
 			return "", 0, false
 		}
@@ -132,6 +134,9 @@ func (s *Shell) Run() error {
 				continue
 			}
 		}
+
+		// Expand aliases before builtin/command handling.
+		line = s.aliases.Expand(line)
 
 		// Builtins
 		if s.handleBuiltin(line, t) {
