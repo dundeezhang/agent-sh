@@ -11,6 +11,7 @@ import (
 type Config struct {
 	API     APIConfig     `toml:"api"`
 	Context ContextConfig `toml:"context"`
+	Shell   ShellConfig   `toml:"shell"`
 }
 
 type APIConfig struct {
@@ -25,6 +26,10 @@ type ContextConfig struct {
 	IncludeGit  bool `toml:"include_git"`
 }
 
+type ShellConfig struct {
+	ShowBanner bool `toml:"show_banner"`
+}
+
 func DefaultConfig() *Config {
 	return &Config{
 		API: APIConfig{
@@ -34,6 +39,9 @@ func DefaultConfig() *Config {
 		Context: ContextConfig{
 			HistorySize: 20,
 			IncludeGit:  true,
+		},
+		Shell: ShellConfig{
+			ShowBanner: true,
 		},
 	}
 }

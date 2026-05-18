@@ -21,6 +21,7 @@ func main() {
 	modelFlag := flag.String("model", "", "Model to use (overrides config)")
 	providerFlag := flag.String("provider", "", "Provider to use: anthropic, openai, ollama")
 	versionFlag := flag.Bool("version", false, "Print version and exit")
+	noBannerFlag := flag.Bool("no-banner", false, "Disable startup banner")
 	flag.Parse()
 
 	if *versionFlag {
@@ -60,6 +61,10 @@ func main() {
 	// Create history buffer
 	history := shell.NewHistory(cfg.Context.HistorySize)
 
+	// Build startup banner
+	banner := fmt.Sprintf("agent-sh v%s | %s/%s", version, cfg.API.Provider, cfg.API.Model)
+	showBanner := cfg.Shell.ShowBanner && !*noBannerFlag
+
 	// Create and run shell
 	sh := shell.New(history, func(input string) {
 		cwd, _ := os.Getwd()
@@ -95,9 +100,7 @@ func main() {
 				fmt.Fprintf(os.Stderr, "warning: writing context: %s\n", err)
 			}
 		}
-	})
-
-	fmt.Printf("agent-sh v%s (AI auto-detects natural language · @ forces AI · @@ forces bash)\n", version)
+	}, shell.WithBanner(banner, showBanner))
 
 	if err := sh.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Shell error: %s\n", err)
