@@ -180,7 +180,7 @@ func containsShellOperator(line string) bool {
 			continue
 		case ch == '|' || ch == '>' || ch == '<' || ch == ';' || ch == '`':
 			return true
-		case ch == '&' && i+1 < len(line) && line[i+1] == '&':
+		case ch == '&':
 			return true
 		case ch == '$' && i+1 < len(line) && line[i+1] == '(':
 			return true
