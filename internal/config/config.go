@@ -11,6 +11,7 @@ import (
 type Config struct {
 	API     APIConfig     `toml:"api"`
 	Context ContextConfig `toml:"context"`
+	Shell   ShellConfig   `toml:"shell"`
 }
 
 type APIConfig struct {
@@ -23,6 +24,19 @@ type APIConfig struct {
 type ContextConfig struct {
 	HistorySize int  `toml:"history_size"`
 	IncludeGit  bool `toml:"include_git"`
+}
+
+type ShellConfig struct {
+	AutoErrorHelp *bool `toml:"auto_error_help"`
+}
+
+// AutoErrorHelpEnabled returns true if auto error help is enabled.
+// Defaults to true when the field is not set.
+func (c ShellConfig) AutoErrorHelpEnabled() bool {
+	if c.AutoErrorHelp == nil {
+		return true
+	}
+	return *c.AutoErrorHelp
 }
 
 func DefaultConfig() *Config {

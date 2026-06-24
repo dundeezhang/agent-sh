@@ -1,6 +1,7 @@
 package shell
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"os/signal"
@@ -15,16 +16,18 @@ type AgentHandler func(input string)
 
 // Shell is a standalone read-eval-execute loop.
 type Shell struct {
-	history      *History
-	agentHandler AgentHandler
-	oldState     *term.State
+	history       *History
+	agentHandler  AgentHandler
+	oldState      *term.State
+	autoErrorHelp bool
 }
 
 // New creates a new standalone Shell.
-func New(history *History, agentHandler AgentHandler) *Shell {
+func New(history *History, agentHandler AgentHandler, autoErrorHelp bool) *Shell {
 	return &Shell{
-		history:      history,
-		agentHandler: agentHandler,
+		history:       history,
+		agentHandler:  agentHandler,
+		autoErrorHelp: autoErrorHelp,
 	}
 }
 
@@ -154,11 +157,67 @@ func (s *Shell) Run() error {
 
 		// Execute as shell command; exit-127 fallback sends to agent.
 		s.restore()
-		if exitCode := s.execCommand(line); exitCode == 127 && !forceBash {
+		result := s.execCommand(line)
+		if result.exitCode == 127 && !forceBash {
 			fmt.Fprintf(os.Stderr, "command not found, asking AI...\n")
 			s.agentHandler(line)
+		} else if s.shouldOfferErrorHelp(result) {
+			if s.promptErrorHelp(result.exitCode) {
+				query := formatErrorQuery(line, result.exitCode, result.stderr)
+				s.agentHandler(query)
+			}
 		}
 		s.rawMode()
 		t.SetPrompt(prompt())
 	}
+}
+
+// shouldOfferErrorHelp decides whether to offer AI help for a failed command.
+func (s *Shell) shouldOfferErrorHelp(r execResult) bool {
+	if !s.autoErrorHelp {
+		return false
+	}
+	if r.exitCode == 0 {
+		return false
+	}
+	// Exit code 130 = SIGINT (Ctrl-C); the user intentionally interrupted.
+	if r.exitCode == 130 {
+		return false
+	}
+	// Exit code 127 is already handled by the command-not-found fallback.
+	if r.exitCode == 127 {
+		return false
+	}
+	// Exit code 1 with empty stderr is common for grep no-match, test
+	// assertions, and other expected non-error failures.
+	if r.exitCode == 1 && strings.TrimSpace(r.stderr) == "" {
+		return false
+	}
+	// Need some stderr output to provide useful context to the agent.
+	if strings.TrimSpace(r.stderr) == "" {
+		return false
+	}
+	return true
+}
+
+// promptErrorHelp prints a subtle prompt asking the user whether they want
+// AI help and reads a single-character response from stdin.
+func (s *Shell) promptErrorHelp(exitCode int) bool {
+	fmt.Fprintf(os.Stderr, "\033[2mCommand failed (exit %d). Ask AI for help? [y/N]\033[0m ", exitCode)
+	reader := bufio.NewReader(os.Stdin)
+	b, err := reader.ReadByte()
+	fmt.Fprintln(os.Stderr) // move to next line
+	if err != nil {
+		return false
+	}
+	return b == 'y' || b == 'Y'
+}
+
+// formatErrorQuery builds the query string sent to the agent when the user
+// requests help with a failed command.
+func formatErrorQuery(command string, exitCode int, stderr string) string {
+	return fmt.Sprintf(
+		"The command `%s` failed with exit code %d. Error output:\n```\n%s\n```\nHelp me understand and fix this error.",
+		command, exitCode, strings.TrimSpace(stderr),
+	)
 }
