@@ -28,6 +28,14 @@ func New(history *History, agentHandler AgentHandler) *Shell {
 	}
 }
 
+// addHistory records a command unless the original input was space-prefixed.
+func (s *Shell) addHistory(cmd string, spacePrefix bool) {
+	if spacePrefix {
+		return
+	}
+	s.history.Add(cmd)
+}
+
 // runAgent restores cooked mode, calls the agent handler, then re-enters
 // raw mode and refreshes the prompt. This pattern is repeated in several
 // places in the REPL so it's factored out here.
@@ -106,6 +114,10 @@ func (s *Shell) Run() error {
 			return nil
 		}
 
+		// Detect space-prefixed commands before trimming so they can be
+		// excluded from history (like bash HISTCONTROL=ignorespace).
+		spacePrefix := strings.HasPrefix(line, " ")
+
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
@@ -126,7 +138,7 @@ func (s *Shell) Run() error {
 				// Agent mode
 				query := strings.TrimSpace(rest)
 				if query != "" {
-					s.history.Add(line)
+					s.addHistory(line, spacePrefix)
 					s.runAgent(t, query)
 				}
 				continue
@@ -135,11 +147,11 @@ func (s *Shell) Run() error {
 
 		// Builtins
 		if s.handleBuiltin(line, t) {
-			s.history.Add(line)
+			s.addHistory(line, spacePrefix)
 			continue
 		}
 
-		s.history.Add(line)
+		s.addHistory(line, spacePrefix)
 
 		if !forceBash {
 			switch classifyInput(line) {

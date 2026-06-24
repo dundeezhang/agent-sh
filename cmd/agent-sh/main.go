@@ -57,8 +57,12 @@ func main() {
 	// Create agent
 	ag := agent.New(p, cfg.API.Model, registry, renderer, cfg.Context.IncludeGit)
 
-	// Create history buffer
-	history := shell.NewHistory(cfg.Context.HistorySize)
+	// Create persistent history
+	historyFile := cfg.Context.HistoryFile
+	if historyFile == "" {
+		historyFile = shell.DefaultHistoryPath()
+	}
+	history := shell.NewHistory(cfg.Context.HistorySize, historyFile)
 
 	// Create and run shell
 	sh := shell.New(history, func(input string) {
