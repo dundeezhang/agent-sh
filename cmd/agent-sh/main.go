@@ -97,6 +97,8 @@ func main() {
 		}
 	})
 
+	sh.SetRCFile(config.RCFilePath())
+
 	fmt.Printf("agent-sh v%s (AI auto-detects natural language · @ forces AI · @@ forces bash)\n", version)
 
 	if err := sh.Run(); err != nil {

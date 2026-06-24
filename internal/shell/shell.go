@@ -18,6 +18,7 @@ type Shell struct {
 	history      *History
 	agentHandler AgentHandler
 	oldState     *term.State
+	rcFile       string
 }
 
 // New creates a new standalone Shell.
@@ -26,6 +27,11 @@ func New(history *History, agentHandler AgentHandler) *Shell {
 		history:      history,
 		agentHandler: agentHandler,
 	}
+}
+
+// SetRCFile sets the path to the RC file that will be loaded on startup.
+func (s *Shell) SetRCFile(path string) {
+	s.rcFile = path
 }
 
 // runAgent restores cooked mode, calls the agent handler, then re-enters
@@ -40,6 +46,12 @@ func (s *Shell) runAgent(t *term.Terminal, input string) {
 
 // Run starts the shell REPL and blocks until exit.
 func (s *Shell) Run() error {
+	// Load RC file before entering raw mode so that any output from
+	// RC commands is displayed normally.
+	if err := s.loadRC(s.rcFile); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: %s\n", err)
+	}
+
 	fd := int(os.Stdin.Fd())
 
 	// Ignore job-control signals in the shell process so it can perform
